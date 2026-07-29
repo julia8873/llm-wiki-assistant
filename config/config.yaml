@@ -1,0 +1,189 @@
+# ==============================================================================
+# ARCHIVO CENTRAL DE CONFIGURACIÓN DEL PROYECTO LLM-WIKI-ASSISTANT
+# ==============================================================================
+# Este fichero es la ÚNICA FUENTE DE VERDAD (Single Source of Truth) para la
+# parametrización de todos los componentes de la arquitectura:
+#   - Contenedores Docker y servicios de red (con perfil opcional para Ollama)
+#   - Integración GitHub (Organización, Plantilla BdC y API)
+#   - Motor LLM con 3 proveedores intercambiables: OpenAI (defecto), Gemini u Ollama
+#   - Estructura y rutas del formato Open Knowledge Format (OKF) en el fork
+#   - Timeouts de red e interconexión
+#   - Esquema de la tabla central de mapeo (Moodle - Asignatura - Fork - Matrix 1:1)
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. SERVICIOS Y RED (Docker Compose)
+# ------------------------------------------------------------------------------
+servicios:
+  # Servicio Moodle (LMS)
+  moodle:
+    nombre_contenedor: "moodle-matrix-dev-moodle-1"
+    puerto_host: 8000
+    puerto_contenedor: 8080
+    url_base: "http://localhost:8000"
+
+  # Base de datos MariaDB para Moodle y el bloque BdC
+  mariadb:
+    nombre_contenedor: "moodle-matrix-dev-mariadb-1"
+    puerto_host: 3306
+    puerto_contenedor: 3306
+    nombre_bd: "moodle_db"
+
+  # Servidor Matrix Synapse
+  synapse:
+    nombre_contenedor: "moodle-matrix-dev-synapse-1"
+    puerto_host: 8008
+    puerto_contenedor: 8008
+    url_base: "http://localhost:8008"
+    url_interna: "http://matrix-synapse:8008"
+    nombre_servidor: "localhost"
+
+  # Cliente Web Element Chat
+  element:
+    nombre_contenedor: "moodle-matrix-dev-element-1"
+    puerto_host: 8081
+    puerto_contenedor: 80
+    url_base: "http://localhost:8081"
+
+  # Motor de Bots Maubot
+  maubot:
+    nombre_contenedor: "moodle-matrix-dev-maubot-1"
+    puerto_host: 29317
+    puerto_contenedor: 29317
+    url_base: "http://localhost:29317"
+
+  # Proveedor de Inferencia LLM Local OPCIONAL (desactivado por defecto; perfil Docker "ollama")
+  llm_server_opcional:
+    activar_perfil_ollama_local: false
+    nombre_contenedor: "ollama-llm-service"
+    puerto_host: 11434
+    puerto_contenedor: 11434
+    url_base: "http://localhost:11434"
+
+# ------------------------------------------------------------------------------
+# 2. INTEGRACIÓN CON GITHUB (OKF & Repositorios)
+# ------------------------------------------------------------------------------
+github:
+  # Organización o usuario propietario de la plantilla y forks
+  organizacion: "julia8873"
+
+  # Repositorio plantilla base en formato OKF
+  repo_plantilla: "BdC-template"
+  url_plantilla: "https://github.com/julia8873/BdC-template"
+
+  # Rama por defecto de los repositorios
+  rama_defecto: "main"
+
+  # Endpoint base de la API REST de GitHub
+  api_base_url: "https://api.github.com"
+
+  # Nombre de la variable de entorno que contendrá el Personal Access Token (PAT)
+  pat_env_var: "GITHUB_PAT"
+
+# ------------------------------------------------------------------------------
+# 3. MOTOR LLM Y CONFIGURACIÓN DE INFERENCIA (3 PROVEEDORES INTERCAMBIABLES)
+# ------------------------------------------------------------------------------
+# NOTA: Cambiar de proveedor se realiza EXCLUSIVAMENTE modificando `proveedor_activo`
+# ("openai", "gemini" u "ollama"). Ningún código requiere modificaciones.
+llm:
+  # Proveedor activo por defecto: "openai" (OpenAI o cualquier endpoint compatible con su API REST)
+  # Opciones válidas: "openai" | "gemini" | "ollama"
+  proveedor_activo: "openai"
+
+  # ----------------------------------------------------------------------------
+  # 3.1. PROVEEDOR OPENAI (OPCIÓN POR DEFECTO - REST PROTOCOL /chat/completions)
+  # ----------------------------------------------------------------------------
+  # Cliente genérico compatible con la API REST estándar de OpenAI.
+  # Al implementar el protocolo estándar (/chat/completions con esquema de mensajes),
+  # se puede usar con OpenAI (gpt-4o, gpt-4o-mini, o3-mini, o1), Azure OpenAI,
+  # LM Studio, vLLM, DeepSeek o cualquier proxy compatible simplemente cambiando `api_base_url`.
+  openai:
+    modelo_defecto: "gpt-4o-mini"
+    api_key_env_var: "OPENAI_API_KEY"
+    api_base_url: "https://api.openai.com/v1"
+    temperatura: 0.2
+    max_tokens: 1024
+    top_p: 0.95
+
+  # ----------------------------------------------------------------------------
+  # 3.2. PROVEEDOR GOOGLE GEMINI (API EXTERNA CON PROTOCOLO PROPIETARIO)
+  # ----------------------------------------------------------------------------
+  # API de Google (generativelanguage.googleapis.com). Utiliza un esquema propio
+  # de petición/respuesta (contents/parts) y autenticación distinta a OpenAI, por lo
+  # que requiere su propio cliente en el plugin.
+  gemini:
+    modelo_defecto: "gemini-1.5-flash"
+    api_key_env_var: "GEMINI_API_KEY"
+    api_base_url: "https://generativelanguage.googleapis.com/v1beta"
+    temperatura: 0.2
+    max_tokens: 1024
+    top_p: 0.95
+
+  # ----------------------------------------------------------------------------
+  # 3.3. PROVEEDOR OLLAMA (INFERENCIA LOCAL OPCIONAL)
+  # ----------------------------------------------------------------------------
+  # Proveedor local (http://localhost:11434 por defecto) instalable opcionalmente
+  # mediante el perfil Docker "ollama" para despliegues 100% offline o sin APIs externas.
+  ollama:
+    modelo_defecto: "llama3"
+    api_base_url: "http://localhost:11434"
+    temperatura: 0.2
+    max_tokens: 1024
+    top_p: 0.9
+
+  # Prompt de sistema que restringe al bot a consultar ÚNICAMENTE el fork del alumno
+  system_prompt: >
+    Eres un asistente docente inteligente (LLM Wiki Assistant) integrado en la sala
+    de Matrix 1:1 del alumno. Tu ÚNICA fuente de información es el repositorio de GitHub (fork BdC)
+    asociado a esta sala. NUNCA debes inventar información externa ni responder sobre
+    temas fuera de la Base de Conocimiento vinculada.
+
+# ------------------------------------------------------------------------------
+# 4. CONVENCIONES Y RUTAS DEL FORMATO OPEN KNOWLEDGE FORMAT (OKF)
+# ------------------------------------------------------------------------------
+okf:
+  # Directorios requeridos dentro del repositorio fork del alumno
+  directorios:
+    conceptos: "conceptos/"
+    bitacora: "bitacora/"
+    recursos: "recursos/"
+
+  # Archivos específicos esperados
+  ficheros:
+    log_bot: "log.md"
+    indice_principal: "index.md"
+    readme: "README.md"
+
+  # Extensiones permitidas para lectura del bot
+  extensiones_permitidas:
+    - ".md"
+    - ".markdown"
+    - ".txt"
+
+# ------------------------------------------------------------------------------
+# 5. TIMEOUTS DE RED Y RESILIENCIA
+# ------------------------------------------------------------------------------
+red_timeouts:
+  conexion_http_segundos: 10
+  lectura_http_segundos: 30
+  github_api_timeout_segundos: 15
+  matrix_api_timeout_segundos: 15
+  llm_inference_timeout_segundos: 60
+
+# ------------------------------------------------------------------------------
+# 6. TABLA DE MAPEO CENTRAL (MOODLE BLOCK BDC - INDEPENDIENTE DEL NATIVO DE MOODLE)
+# ------------------------------------------------------------------------------
+# NOTA: Moodle incluye communication/provider/matrix (1 sala por CURSO).
+# block_bdc NO intercepta ese módulo; crea sus propias salas 1:1 por ALUMNO.
+mapeo_bdc:
+  nombre_tabla: "mdl_block_bdc_mapping"
+  campos:
+    id: "id"
+    usuario_moodle: "userid"
+    asignatura_moodle: "courseid"
+    github_fork_url: "github_fork_url"
+    github_branch: "github_branch"
+    matrix_room_id: "matrix_room_id"
+    matrix_room_alias: "matrix_room_alias"
+    creado_el: "timecreated"
+    modificado_el: "timemodified"

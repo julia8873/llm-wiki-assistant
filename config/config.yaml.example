@@ -1,0 +1,117 @@
+# ==============================================================================
+# PLANTILLA DE CONFIGURACIÓN CENTRAL (config.yaml.example)
+# Copiar a config/config.yaml y ajustar según el entorno local si es necesario.
+# ==============================================================================
+servicios:
+  moodle:
+    nombre_contenedor: "moodle-matrix-dev-moodle-1"
+    puerto_host: 8000
+    puerto_contenedor: 8080
+    url_base: "http://localhost:8000"
+
+  mariadb:
+    nombre_contenedor: "moodle-matrix-dev-mariadb-1"
+    puerto_host: 3306
+    puerto_contenedor: 3306
+    nombre_bd: "moodle_db"
+
+  synapse:
+    nombre_contenedor: "moodle-matrix-dev-synapse-1"
+    puerto_host: 8008
+    puerto_contenedor: 8008
+    url_base: "http://localhost:8008"
+    url_interna: "http://matrix-synapse:8008"
+    nombre_servidor: "localhost"
+
+  element:
+    nombre_contenedor: "moodle-matrix-dev-element-1"
+    puerto_host: 8081
+    puerto_contenedor: 80
+    url_base: "http://localhost:8081"
+
+  maubot:
+    nombre_contenedor: "moodle-matrix-dev-maubot-1"
+    puerto_host: 29317
+    puerto_contenedor: 29317
+    url_base: "http://localhost:29317"
+
+  llm_server_opcional:
+    activar_perfil_ollama_local: false
+    nombre_contenedor: "ollama-llm-service"
+    puerto_host: 11434
+    puerto_contenedor: 11434
+    url_base: "http://localhost:11434"
+
+github:
+  organizacion: "julia8873"
+  repo_plantilla: "BdC-template"
+  url_plantilla: "https://github.com/julia8873/BdC-template"
+  rama_defecto: "main"
+  api_base_url: "https://api.github.com"
+  pat_env_var: "GITHUB_PAT"
+
+llm:
+  # Proveedor activo por defecto: "openai" ("openai" | "gemini" | "ollama")
+  proveedor_activo: "openai"
+
+  openai:
+    modelo_defecto: "gpt-4o-mini"
+    api_key_env_var: "OPENAI_API_KEY"
+    api_base_url: "https://api.openai.com/v1"
+    temperatura: 0.2
+    max_tokens: 1024
+    top_p: 0.95
+
+  gemini:
+    modelo_defecto: "gemini-1.5-flash"
+    api_key_env_var: "GEMINI_API_KEY"
+    api_base_url: "https://generativelanguage.googleapis.com/v1beta"
+    temperatura: 0.2
+    max_tokens: 1024
+    top_p: 0.95
+
+  ollama:
+    modelo_defecto: "llama3"
+    api_base_url: "http://localhost:11434"
+    temperatura: 0.2
+    max_tokens: 1024
+    top_p: 0.9
+
+  system_prompt: >
+    Eres un asistente docente inteligente (LLM Wiki Assistant) integrado en la sala
+    de Matrix 1:1 del alumno. Tu ÚNICA fuente de información es el repositorio de GitHub (fork BdC)
+    asociado a esta sala.
+
+okf:
+  directorios:
+    conceptos: "conceptos/"
+    bitacora: "bitacora/"
+    recursos: "recursos/"
+  ficheros:
+    log_bot: "log.md"
+    indice_principal: "index.md"
+    readme: "README.md"
+  extensiones_permitidas:
+    - ".md"
+    - ".markdown"
+    - ".txt"
+
+red_timeouts:
+  conexion_http_segundos: 10
+  lectura_http_segundos: 30
+  github_api_timeout_segundos: 15
+  matrix_api_timeout_segundos: 15
+  llm_inference_timeout_segundos: 60
+
+mapeo_bdc:
+  nombre_tabla: "mdl_block_bdc_mapping"
+  campos:
+    id: "id"
+    usuario_moodle: "userid"
+    asignatura_moodle: "courseid"
+    github_fork_url: "github_fork_url"
+    github_branch: "github_branch"
+    matrix_room_id: "matrix_room_id"
+    matrix_room_alias: "matrix_room_alias"
+    creado_el: "timecreated"
+    modificado_el: "timemodified"
