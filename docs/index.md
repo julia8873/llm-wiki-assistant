@@ -8,12 +8,14 @@ Sistema integrado de docencia Moodle-Matrix-GitHub.
 - **Matrix/Synapse**: Provee salas de chat 1:1.
 - **Maubot (LLM Wiki Assistant)**: Agente LLM que atiende consultas basándose exclusivamente en el repositorio asignado a la sala.
 
-## Fases de Implementación
+## Fases de Implementación y Resumen de Estado
+Puedes consultar el histórico detallado y las pruebas en el \subpage resumen_fases.
+
 | Fase | Descripción | Estado |
 |---|---|---|
 | 0.1 | Documentación Doxygen y Configuración Base | ✅ Completada |
-| 1 | Infraestructura Docker Compose | ⏳ Pendiente |
-| 2 | Bloque Moodle `block_bdc` | ⏳ Pendiente |
-| 3 | Sincronización Moodle-Matrix-GitHub | ⏳ Pendiente |
-| 4 | Pruebas Automáticas | ⏳ Pendiente |
+| 1 | Infraestructura Docker Compose | ✅ Completada |
+| 2 | Almacén de Mapeos (FastAPI + SQLite) | ✅ Completada |
+| 3 | Bloque Moodle `block_bdc` | ⏳ Siguiente |
+| 4 | Sincronización Moodle-Matrix-GitHub | ⏳ Pendiente |
 | 5 | Plugin Maubot `llm-wiki-assistant` | ⏳ Pendiente |

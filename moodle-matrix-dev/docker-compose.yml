@@ -31,12 +31,14 @@ services:
       - MOODLE_EMAIL=${MOODLE_EMAIL}
       - MOODLE_SITE_NAME=LLM Wiki Assistant Moodle
       - MOODLE_HOST=localhost:${MOODLE_PUERTO_HOST}
+      - MAPEO_API_TOKEN=${MAPEO_API_TOKEN}
     depends_on:
       mariadb:
         condition: service_healthy
     volumes:
       - moodle_data:/bitnami/moodle
       - moodledata_data:/bitnami/moodledata
+      - ./moodle_plugins/block_bdc:/bitnami/moodle/blocks/bdc
     healthcheck:
       test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/8080'"]
       interval: 15s
