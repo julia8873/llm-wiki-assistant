@@ -41,7 +41,7 @@ Sistema integrado de docencia Moodle-Matrix-GitHub. Proporciona a cada estudiant
 - ✅ **Fase 1**: Infraestructura Docker Compose.
 - ⏳ **Fase 2**: Bloque Moodle `block_bdc`.
 - ⏳ **Fase 3**: Sincronización Moodle-Matrix-GitHub.
-- ⏳ **Fase 4**: Pruebas Automáticas.
+- ✅ **Fase 4**: Provisionamiento GitHub y Pruebas de Integración.
 - ⏳ **Fase 5**: Plugin Maubot `llm-wiki-assistant`.
 
 *Toda la documentación técnica se genera vía Doxygen. Ejecuta `./instalar.sh docs serve` para acceder a ella.*

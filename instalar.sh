@@ -339,12 +339,12 @@ main() {
   local cmd="$1"; shift || true
   case "$cmd" in
     docs)           cmd_docs   "${@:-serve}" ;;
-    up)             cmd_up ;;
-    down)           cmd_down ;;
-    logs)           cmd_logs ;;
-    status)         cmd_status ;;
-    git)            cmd_git ;;
-    bot)            cmd_bot ;;
+    up)             cmd_up "$@" ;;
+    down)           cmd_down "$@" ;;
+    logs)           cmd_logs "$@" ;;
+    status)         cmd_status "$@" ;;
+    git)            cmd_git "$@" ;;
+    bot)            cmd_bot "$@" ;;
     help|-h|--help) usage ;;
     *) error "Comando desconocido: '${cmd}'. Utiliza 'help' para listado completo." ;;
   esac

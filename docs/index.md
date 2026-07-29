@@ -16,6 +16,6 @@ Puedes consultar el histórico detallado y las pruebas en el \subpage resumen_fa
 | 0.1 | Documentación Doxygen y Configuración Base | ✅ Completada |
 | 1 | Infraestructura Docker Compose | ✅ Completada |
 | 2 | Almacén de Mapeos (FastAPI + SQLite) | ✅ Completada |
-| 3 | Bloque Moodle `block_bdc` | ⏳ Siguiente |
-| 4 | Sincronización Moodle-Matrix-GitHub | ⏳ Pendiente |
+| 3 | Bloque Moodle `block_bdc` | ✅ Completada |
+| 4 | Provisionamiento GitHub y pruebas de integración | ✅ Completada |
 | 5 | Plugin Maubot `llm-wiki-assistant` | ⏳ Pendiente |

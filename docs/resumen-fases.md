@@ -117,3 +117,31 @@ Esta fase conectó el frontend del LMS (Moodle) con el backend de orquestación,
   - **Test `test_idempotencia_409`**: Inyecta una excepción `409 Conflict` artificial en el mock del `mapeo_client` y valida que el bloque sea capaz de procesarlo y finalizar con éxito recuperando la sala original.
 - **Test Estricto Doxygen**: `WARN_AS_ERROR=YES` superado con éxito.
 - **Validación Manual E2E**: Despliegue de dos usuarios ficticios simultáneos (`alumno1` y `alumno2`) comprobando que se redirigían a dos salas de Matrix completamente distintas y generaban dos registros únicos en la API de mapeos local.
+
+---
+
+## Fase 4: Provisionamiento GitHub y Pruebas de Integración
+Esta fase cerró el ciclo de automatización entre Moodle, el microservicio de mapeos y GitHub, permitiendo generar repositorios de curso y de alumno de forma reproducible y segura.
+
+### Desarrollo e Implementación
+- **Centralización del Token GitHub**: El PAT se movió a `config/config.yaml` y el script `instalar.sh` genera automáticamente `moodle-matrix-dev/.env` inyectando la variable `GITHUB_PAT` para que el stack y los scripts puedan reutilizarla sin depender de secretos dispersos.
+- **Provisionamiento del repositorio maestro de curso**: Se implementó `moodle-matrix-dev/scripts/configurar_bdc_core.py`, que usa la API REST de GitHub para:
+  - crear un repositorio oficial de asignatura a partir de un template base,
+  - marcarlo como `is_template=true`,
+  - añadir profesores como colaboradores con permisos `maintain`,
+  - ignorar de forma explícita el caso en el que el usuario a añadir coincide con el propietario del repositorio.
+- **Aprovisionamiento de repositorios de alumno**: Se amplió `moodle-matrix-dev/mapeo-api/app/services/github_service.py` para que, al crear un mapeo de alumno, se verifique si el repositorio ya existe y, si no, se genere desde el template oficial mediante el endpoint `/generate` manteniendo un comportamiento idempotente.
+- **Integración con FastAPI y Settings**: El servicio de GitHub ahora lee la configuración desde `GITHUB_PAT` y desde la configuración cargada por `app/core/config.py`, facilitando el despliegue tanto en Docker como en pruebas locales.
+- **Automatización del flujo de instalación**: El comando `./instalar.sh git` ejecuta el provisionamiento de GitHub en un contenedor efímero de Python, lo que permite escalar el proceso sin exigir un entorno virtual local.
+
+### Pruebas Realizadas
+- **Suite de pruebas del servicio GitHub**: Se añadió `moodle-matrix-dev/mapeo-api/tests/test_github_service.py` con pruebas que cubren:
+  - creación de un repositorio nuevo,
+  - reutilización de un repositorio ya existente,
+  - manejo de errores controlados de la API,
+  - lectura del PAT desde los settings del servicio.
+- **Validación de flujo real**: Se ejecutó el script de provisionamiento con un PAT válido y se comprobó que el repositorio oficial se generaba o reutilizaba correctamente, sin detenerse por el caso de propietario-colaborador.
+- **Validación documental**: Se verificó que la documentación generada por Doxygen siguiera siendo válida en modo estricto con `WARN_AS_ERROR=YES`.
+
+### Resultado Obtenido
+El proyecto ya permite completar el ciclo completo de aprovisionamiento de repositorios en GitHub desde la instalación base, reduciendo la intervención manual y dejando preparada la infraestructura para el siguiente escalado en entornos reales de aula.
