@@ -1,12 +1,15 @@
-# Tabla de Mapeo: Alumno - Fork - Sala Matrix
+# Tabla de Mapeo Moodle-Matrix-GitHub
 
-La pieza central del diseño es la tabla de base de datos **`mdl_block_bdc_mapping`**, gestionada por el plugin Moodle `block_bdc`.
+## Justificación Arquitectónica
+Moodle 4.2+ incluye nativamente `communication/provider/matrix`, el cual asocia **una única sala compartida por curso**. Este modelo es incompatible con el requerimiento de salas privadas 1:1 por alumno. 
+Por ello, se implementa el plugin `block_bdc` operando de forma totalmente aislada con una tabla de mapeo propia.
 
-## Esquema SQL
+## Esquema `mdl_block_bdc_mapping`
+Gestiona la triada relacional Alumno-Repositorio-Sala.
 
 ```sql
 CREATE TABLE mdl_block_bdc_mapping (
-    id BIGINT(10) NOT NULL AUTO_INCREMENT,
+    id BIGINT(10) NOT NULL AUTO_INCREMENT PRIMARY KEY,
     userid BIGINT(10) NOT NULL,
     courseid BIGINT(10) NOT NULL,
     github_fork_url VARCHAR(255) NOT NULL,
@@ -15,11 +18,6 @@ CREATE TABLE mdl_block_bdc_mapping (
     matrix_room_alias VARCHAR(255) NULL,
     timecreated BIGINT(10) NOT NULL,
     timemodified BIGINT(10) NOT NULL,
-    PRIMARY KEY (id),
     UNIQUE KEY uk_user_course (userid, courseid)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
-
-## Relación con el Subsistema Nativo de Moodle
-
-Moodle (4.2+) incluye `communication/provider/matrix` que crea 1 sala compartida por curso. El plugin `block_bdc` es **completamente independiente** de ese subsistema y no lo intercepta, gestionando sus propias salas privadas 1:1 por alumno.

@@ -1,20 +1,19 @@
-# LLM Wiki Assistant - Documentación del Proyecto
+# LLM Wiki Assistant
 
-Bienvenido a la documentación oficial del entorno docente **LLM Wiki Assistant**.
+Sistema integrado de docencia Moodle-Matrix-GitHub.
 
-## 📌 Visión General
-Este sistema integra:
-- **Moodle (LMS)**: Gestión de cursos y alumnos.
-- **GitHub**: Repositorio maestro de asignatura y forks individuales por alumno en formato Open Knowledge Format (OKF).
-- **Matrix / Element**: Salas de chat privadas 1:1 por alumno.
-- **Maubot / LLM Wiki Assistant**: Bot conversacional acotado estrictamente a leer el fork del alumno de la sala actual.
+## Componentes Core
+- **Moodle (LMS)**: Gestiona matriculaciones y orquesta la creación de repositorios.
+- **GitHub**: Almacena repositorios (forks) individuales en Open Knowledge Format (OKF).
+- **Matrix/Synapse**: Provee salas de chat 1:1.
+- **Maubot (LLM Wiki Assistant)**: Agente LLM que atiende consultas basándose exclusivamente en el repositorio asignado a la sala.
 
-## 🧭 Navegación de la Documentación
-- [Arquitectura del Sistema](arquitectura.md): Descripción de componentes, diagramas e infraestructura.
-- [Instalación y Despliegue](instalacion.md): Guía de despliegue local mediante Docker Compose.
-- [Mapeo Alumno-Fork-Sala](mapeo-alumno-fork.md): Esquema de la tabla central `mdl_block_bdc_mapping`.
-- [Bot Maubot](bot.md): Estado y especificación del plugin Maubot.
-- [Seguridad y Credenciales](seguridad.md): Gestión de secretos y plantillas `.example`.
-
-## ⚙️ Estado Actual del Proyecto
-El proyecto se encuentra en la **Fase 0.1 (Documentación MkDocs y Configuración Base)**. Las fases de infraestructura Docker, desarrollo del bloque Moodle y plugin Maubot se completarán secuencialmente.
+## Fases de Implementación
+| Fase | Descripción | Estado |
+|---|---|---|
+| 0.1 | Documentación Doxygen y Configuración Base | ✅ Completada |
+| 1 | Infraestructura Docker Compose | ⏳ Pendiente |
+| 2 | Bloque Moodle `block_bdc` | ⏳ Pendiente |
+| 3 | Sincronización Moodle-Matrix-GitHub | ⏳ Pendiente |
+| 4 | Pruebas Automáticas | ⏳ Pendiente |
+| 5 | Plugin Maubot `llm-wiki-assistant` | ⏳ Pendiente |

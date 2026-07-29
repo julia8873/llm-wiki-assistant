@@ -52,7 +52,7 @@ servicios:
     puerto_contenedor: 29317
     url_base: "http://localhost:29317"
 
-  # Servidor de Documentación MkDocs (Fase 0.1)
+  # Servidor de Documentación Doxygen (Fase 0.1)
   docs:
     nombre_contenedor: "llm-wiki-docs"
     puerto_host: 8005

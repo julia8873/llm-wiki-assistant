@@ -1,20 +1,21 @@
 # Plugin Bot Maubot (`llm-wiki-assistant-plugin`)
 
-El bot es el componente encargado de atender las consultas de los estudiantes en sus salas 1:1 de Matrix.
-
 ## Estado de Implementación
-
-> [!NOTE]
-> **Estado Actual (Fase 0.1)**: El código funcional del bot aún no está implementado. Se desarrollará en la **Fase 5** del plan de trabajo.
-> En esta fase se encuentra preparada la estructura base de carpetas en `moodle-matrix-dev/maubot/llm-wiki-assistant-plugin/` con el directorio `mixins/`.
-
-## Principio de Aislamiento Estricto
-
-En la Fase 5, el bot atenderá la sala y **únicamente** podrá leer y consultar información del repositorio fork de GitHub vinculado a la sala actual del alumno.
+El código fuente del bot aún no está implementado. Se desarrollará íntegramente en la **Fase 5**. 
+Estructura base preparada en `moodle-matrix-dev/maubot/llm-wiki-assistant-plugin/`.
 
 ## Proveedores LLM Soportados
+El sistema abstrae la capa de inferencia para permitir el intercambio en caliente mediante la configuración central `config/config.yaml`.
 
-El bot integrará 3 proveedores intercambiables desde `config/config.yaml`:
-1. **`openai`** (por defecto): API REST estándar de OpenAI (`gpt-4o-mini`, `gpt-4o`, etc.) o proxies compatibles.
-2. **`gemini`**: API de Google Gemini (`gemini-1.5-flash`).
-3. **`ollama`**: Inferencia local opcional.
+| Proveedor | API Base | Modelo Principal |
+|---|---|---|
+| **OpenAI** (Defecto) | `https://api.openai.com/v1` | `gpt-4o-mini` |
+| **Gemini** | `generativelanguage.googleapis.com` | `gemini-1.5-flash` |
+| **Ollama** | `http://localhost:11434` | `llama3` |
+
+## Ciclo de Ejecución (Proyectado Fase 5)
+1. **Trigger**: Recepción de mensaje en sala Matrix.
+2. **Autorización**: Consulta a `mdl_block_bdc_mapping` para obtener URL del fork asignado a la sala.
+3. **Lectura (RAG)**: Descarga/Indexación de archivos `.md` del fork.
+4. **Inferencia**: Petición al proveedor LLM inyectando el contexto OKF.
+5. **Respuesta**: Envío de salida a la sala Matrix.

@@ -1,24 +1,20 @@
-# Arquitectura del Sistema
+# Arquitectura y Diseño
 
-El proyecto implementa un modelo de aislamiento estricto por alumno.
+## Diseño de Aislamiento Estricto
+El sistema aísla la información de cada alumno para evitar contaminación cruzada de datos (LLM hallucination) y preservar la estricta privacidad del estudiante.
 
-## Modelo 1:1 Alumno - Fork - Sala Matrix
+- **Asignación 1:1**: 1 Alumno <--> 1 Fork GitHub <--> 1 Sala Matrix.
+- **Lectura Restringida**: Maubot opera bajo credenciales limitadas exclusivamente al fork vinculado a la sala de ejecución, impidiendo el acceso a repositorios de otros estudiantes.
 
-1. **Repo Maestro**: Basado en `BdC-template` en GitHub.
-2. **Fork por Alumno**: Cada estudiante dispone de su propio fork.
-3. **Sala Matrix 1:1**: Sala privada en Synapse vinculada al alumno.
-4. **Bot Maubot**: Atiende la sala y consulta **exclusivamente** el fork del alumno vinculado.
+## Mapa de Servicios (Puertos)
+Definidos centralmente en `config/config.yaml`.
 
-## Puertos de Servicios
-
-Los puertos están definidos centralmente en `config/config.yaml`:
-
-| Servicio | Puerto Host | Puerto Contenedor | Descripción |
-| :--- | :--- | :--- | :--- |
-| **Moodle** | `8000` | `8080` | LMS principal |
-| **MariaDB** | `3306` | `3306` | Base de datos Moodle |
-| **Synapse** | `8008` | `8008` | Matrix Homeserver |
-| **Element Web** | `8081` | `80` | Cliente Web Matrix |
-| **Maubot** | `29317` | `29317` | Motor de Bots |
-| **MkDocs** | `8005` | `8000` | Servidor de Documentación |
-| **Ollama (Opcional)** | `11434` | `11434` | Inferencia LLM local opcional |
+| Servicio | Host | Contenedor | Propósito |
+|---|---|---|---|
+| Moodle | `8000` | `8080` | Plataforma LMS principal. |
+| MariaDB | `3306` | `3306` | Persistencia de datos Moodle. |
+| Synapse | `8008` | `8008` | Servidor de mensajería Matrix. |
+| Element Web | `8081` | `80` | Cliente web Matrix. |
+| Maubot | `29317` | `29317` | Backend de ejecución del bot. |
+| Doxygen | `8005` | `8000` | Servidor de documentación HTML. |
+| Ollama | `11434` | `11434` | Inferencia LLM local (Opcional). |
