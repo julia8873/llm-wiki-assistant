@@ -54,10 +54,16 @@ if ($lock) {
         
         // Determinamos el ID de matrix del alumno. 
         // Asumimos un mapeo simple: @user_{id}:localhost
-        $matrix_user_id = '@user_' . $userid . ':localhost'; 
-        $alias = 'bdc_u' . $userid . '_c' . $courseid;
+        // Usamos el username de Moodle como ID en Matrix para asegurar la identidad.
+        $matrix_user_id = '@' . $USER->username . ':localhost'; 
+        $alias = 'bdc_u' . $userid . '_c' . $courseid . '_t' . time();
         
-        $room_id = $synapse_client->create_room($alias, $matrix_user_id);
+        // Fase 4.1: Asegurarnos de que el usuario exista en Matrix antes de invitarlo.
+        $synapse_client->ensure_user_exists($USER->username);
+        
+        $room_name = $course->fullname;
+        $topic = 'Chat 1:1 conectado a tu repositorio de base de conocimiento para la asignatura ' . $course->fullname;
+        $room_id = $synapse_client->create_room($alias, $matrix_user_id, $room_name, $topic);
         
         // Ya no enviamos un placeholder, la API de mapeo lo provisiona
         $github_url = '';

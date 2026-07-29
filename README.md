@@ -10,6 +10,9 @@ Sistema integrado de docencia Moodle-Matrix-GitHub. Proporciona a cada estudiant
 
 ## Comandos Operativos Base
 
+> [!WARNING]
+> **Aviso de Seguridad en Producción (Element Web)**: Durante la fase de desarrollo e integración, se han desactivado los avisos de cifrado de extremo a extremo (E2EE) y de copias de seguridad de claves (`UIFeature.keyBackup` y `UIFeature.crossSigning`) en `moodle-matrix-dev/element-config.json` para facilitar las pruebas del bot LLM sin fricción. Antes de desplegar el entorno en producción para la Universidad, se debe evaluar si se requiere E2EE estricto y, en tal caso, volver a activar estas variables.
+
 Único punto de entrada: `instalar.sh`.
 
 ```bash
@@ -25,6 +28,19 @@ Sistema integrado de docencia Moodle-Matrix-GitHub. Proporciona a cada estudiant
 # Verificación estricta de documentación (Falla ante warnings)
 ./instalar.sh docs check
 ```
+
+## Credenciales de Prueba
+
+Para probar el flujo de autenticación delegada (SSO) y la provisión de repositorios, se recomienda el uso de los siguientes usuarios de prueba (con los mismos datos de acceso en Moodle y Element):
+
+| Usuario | Contraseña | Rol / Propósito |
+|---------|------------|-----------------|
+| `admin` | `adminpass123` | Administrador de plataforma Moodle / Creador de plantillas |
+| `teacher1` | `Teacher1!` | Profesor del curso (gestión) |
+| `student1` | `Student1!` | Estudiante de prueba principal (Fork #1) |
+| `student2` | `Student2!` | Estudiante secundario para pruebas de concurrencia (Fork #2) |
+
+> **Nota:** Se aconseja utilizar pestañas en modo incógnito al alternar entre `student1` y `student2` para evitar que Element re-cargue sesiones guardadas previas (localStorage) e impida el acceso cruzado.
 
 ## Arquitectura y Componentes
 

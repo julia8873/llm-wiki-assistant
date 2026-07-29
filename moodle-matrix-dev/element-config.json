@@ -10,5 +10,9 @@
     },
     "disable_custom_urls": false,
     "disable_guests": true,
-    "brand": "Matrix Local Dev"
+    "brand": "Matrix Local Dev",
+    "setting_defaults": {
+        "UIFeature.keyBackup": false,
+        "UIFeature.crossSigning": false
+    }
 }

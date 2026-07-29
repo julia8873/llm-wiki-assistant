@@ -133,6 +133,13 @@ Esta fase cerró el ciclo de automatización entre Moodle, el microservicio de m
 - **Aprovisionamiento de repositorios de alumno**: Se amplió `moodle-matrix-dev/mapeo-api/app/services/github_service.py` para que, al acceder un alumno a la sala por primera vez, el sistema provisione un fork a partir de la plantilla recién generada.
 - **Integración con FastAPI y Settings**: El servicio de GitHub lee la configuración desde `GITHUB_PAT` y desde `app/core/config.py`, facilitando la portabilidad.
 
+### Fase 4.1: Integración Completa de Identidad (SSO Delegado Moodle-Matrix) y Limpieza para Producción
+- **Aprovisionamiento Automático en Synapse (Sin Mocks)**: Cuando el bloque `bdc` intenta vincular a un usuario a su sala, llama a la API de administración de Synapse (`ensure_user_exists`) para crear la cuenta de Element en segundo plano con una clave aleatoria, impidiendo fallos de invitación. Se configuró un `MATRIX_ACCESS_TOKEN` real de administrador, eliminando los *mocks* temporales y validando la creación real de salas y usuarios.
+- **Nombres Dinámicos de Salas**: Moodle ahora inyecta dinámicamente el nombre de la asignatura y enlaza el "topic" (descripción) de la sala al repositorio aprovisionado, logrando que el estudiante vea explícitamente "Asistente IA - <Nombre de la Asignatura>".
+- **Autenticación Delegada (Password Provider)**: Se instaló el módulo `matrix-synapse-rest-password-provider` en el contenedor de Synapse para que las comprobaciones de contraseñas se deleguen a Moodle. Se parcheó para inyectar la cabecera `Host` correcta (`localhost:8000`) hacia Moodle, esquivando los bloqueos por protección de URL (`$CFG->wwwroot`).
+- **Endpoint de Autenticación de Moodle (`api/auth.php`)**: Se refactorizó este script para utilizar directamente los plugins nativos de autenticación (`get_auth_plugin()->user_login()`) en lugar de funciones de alto nivel. Esto previno excepciones fatales por redirección de sesión oculta (`redirecterrordetected`), consiguiendo una respuesta cruda (JSON) limpia.
+- **Fricción Cero en Producción (Desactivación E2EE)**: Se desactivaron en `element-config.json` los avisos intrusivos de cifrado de extremo a extremo (E2EE) y de respaldo de llaves cruzadas (`UIFeature.keyBackup` y `UIFeature.crossSigning`), ya que para interacciones 1:1 con un LLM académico la usabilidad prioriza sobre el cifrado dispositivo-a-dispositivo.
+
 ### Pruebas Realizadas
 - **Suite de pruebas del servicio GitHub**: Se añadió `moodle-matrix-dev/mapeo-api/tests/test_github_service.py` con pruebas que cubren:
   - creación de un repositorio nuevo,

@@ -11,6 +11,10 @@
 # https://element-hq.github.io/synapse/latest/usage/configuration/config_documentation.html
 server_name: "localhost"
 pid_file: /data/homeserver.pid
+
+# Permitir a Element Web conectarse desde el navegador
+cors_allowed_origins:
+  - '*'
 listeners:
   - port: 8008
     bind_addresses: ['0.0.0.0']
@@ -38,5 +42,10 @@ trusted_key_servers:
 
 enable_registration: true
 enable_registration_without_verification: true
+
+password_providers:
+  - module: "rest_auth_provider.RestAuthProvider"
+    config:
+      endpoint: "http://moodle:8080/blocks/bdc/api/auth.php"
 
 # vim:ft=yaml

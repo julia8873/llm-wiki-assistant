@@ -32,6 +32,8 @@ services:
       - MOODLE_SITE_NAME=LLM Wiki Assistant Moodle
       - MOODLE_HOST=localhost:${MOODLE_PUERTO_HOST}
       - MAPEO_API_TOKEN=${MAPEO_API_TOKEN}
+      - MATRIX_ACCESS_TOKEN=${MATRIX_ACCESS_TOKEN}
+      - SYNAPSE_URL_INTERNA=http://synapse:8008
     depends_on:
       mariadb:
         condition: service_healthy
@@ -54,8 +56,10 @@ services:
     environment:
       - SYNAPSE_SERVER_NAME=localhost
       - SYNAPSE_REPORT_STATS=no
+      - PYTHONPATH=/data
     volumes:
       - ./synapse-data:/data
+      - ./synapse-custom/rest_auth_provider.py:/data/rest_auth_provider.py:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8008/health"]
       interval: 10s

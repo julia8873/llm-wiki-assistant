@@ -32,10 +32,11 @@ class block_bdc_synapse_admin_client {
      * Constructor del cliente.
      */
     public function __construct() {
-        $this->baseurl = getenv('SYNAPSE_URL_INTERNA') ?: 'http://matrix-synapse:8008';
-        // Asumiremos que el token de admin o bot se lee desde el entorno.
-        // En una implementación final este token debe configurarse adecuadamente.
-        $this->token = getenv('MATRIX_ACCESS_TOKEN') ?: 'token_admin_matrix_falso';
+        $this->baseurl = getenv('SYNAPSE_URL_INTERNA') ?: 'http://synapse:8008';
+        $this->token = getenv('MATRIX_ACCESS_TOKEN');
+        if (empty($this->token)) {
+            throw new moodle_exception('error_missing_token', 'block_bdc', '', 'MATRIX_ACCESS_TOKEN no está configurado en el entorno.');
+        }
     }
 
     /**
@@ -46,7 +47,7 @@ class block_bdc_synapse_admin_client {
      * @return string ID de la sala de Matrix creada (ej. !xyz:localhost).
      * @throws moodle_exception
      */
-    public function create_room($room_alias, $invite_user_id) {
+    public function create_room($room_alias, $invite_user_id, $room_name = 'Sala de Asistente IA', $topic = 'Chat 1:1 con tu asistente LLM') {
         $curl = new \curl(['ignoresecurity' => true]);
         $curl->setHeader('Authorization: Bearer ' . $this->token);
         $curl->setHeader('Content-Type: application/json');
@@ -54,8 +55,8 @@ class block_bdc_synapse_admin_client {
         $payload = [
             'visibility' => 'private',
             'room_alias_name' => $room_alias,
-            'name' => 'Sala de Asistente IA',
-            'topic' => 'Chat 1:1 con tu asistente LLM',
+            'name' => $room_name,
+            'topic' => $topic,
             'invite' => [$invite_user_id]
         ];
         
@@ -68,12 +69,43 @@ class block_bdc_synapse_admin_client {
         $data = json_decode($response, true);
         
         if ($status !== 200 || empty($data['room_id'])) {
-            // [FASE 3 - MOCK]: Como aún no hemos configurado el bot ni su token de admin real,
-            // Synapse va a rechazar la petición con un 401. Para poder completar la prueba
-            // de la lógica de Moodle en la Fase 3, devolvemos una sala ficticia y no bloqueamos.
-            return '!dummy_room_' . time() . rand(100, 999) . ':localhost';
+            throw new moodle_exception('error_create_room', 'block_bdc', '', $response);
         }
         
         return $data['room_id'];
+    }
+
+    /**
+     * Asegura que el usuario exista en Matrix. Si no existe, lo crea.
+     * Utiliza la API de administración de Synapse.
+     *
+     * @param string $username Nombre de usuario de Moodle (ej. 'student1')
+     * @return bool True si el usuario existe o fue creado, False en caso de error crítico.
+     */
+    public function ensure_user_exists($username) {
+        $curl = new \curl(['ignoresecurity' => true]);
+        $curl->setHeader('Authorization: Bearer ' . $this->token);
+        $curl->setHeader('Content-Type: application/json');
+
+        $user_id = '@' . $username . ':localhost';
+        $url = $this->baseurl . '/_synapse/admin/v2/users/' . urlencode($user_id);
+
+        // Generamos un password aleatorio muy largo. Nunca será usado por el alumno
+        // porque el módulo REST Password Provider delega la validación de contraseñas a Moodle.
+        $payload = [
+            'password' => bin2hex(random_bytes(20)),
+            'displayname' => $username,
+            'admin' => false,
+            'deactivated' => false
+        ];
+
+        $response = $curl->put($url, json_encode($payload));
+        $status = $curl->get_info()['http_code'];
+
+        if ($status === 200 || $status === 201) {
+            return true;
+        }
+
+        return false;
     }
 }

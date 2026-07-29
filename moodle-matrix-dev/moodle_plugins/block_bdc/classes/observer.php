@@ -19,9 +19,9 @@ class observer {
      * Triggered when a course is created.
      * Calls the mapeo-api to provision the official repository.
      *
-     * @param \\core\\event\\course_created $event
+     * @param \core\event\course_created $event
      */
-    public static function course_created(\\core\\event\\course_created $event) {
+    public static function course_created(\core\event\course_created $event) {
         global $DB;
         
         $course = $event->get_record_snapshot('course', $event->objectid);

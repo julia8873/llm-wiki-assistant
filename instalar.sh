@@ -280,6 +280,20 @@ cmd_up() {
     
     if [[ "$m_status" == "healthy" && "$api_status" == "healthy" ]]; then
       ok "Moodle y mapeo-api están operativos."
+      
+      # Configuramos el SSO de Matrix automáticamente si es la primera vez
+      if [[ -f "synapse-data/homeserver.yaml" ]] && ! grep -q "password_providers:" "synapse-data/homeserver.yaml"; then
+        info "Inyectando configuración SSO de Moodle en Synapse..."
+        cat << 'EOF' >> "synapse-data/homeserver.yaml"
+
+password_providers:
+  - module: "rest_auth_provider.RestAuthProvider"
+    config:
+      endpoint: "http://moodle:8080/blocks/bdc/api/auth.php"
+EOF
+        docker compose restart synapse
+        ok "Synapse reiniciado con soporte SSO."
+      fi
       break
     fi
     
