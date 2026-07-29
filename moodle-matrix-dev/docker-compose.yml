@@ -80,8 +80,10 @@ services:
     container_name: ${MAPEO_API_NOMBRE_CONTENEDOR}
     environment:
       - MAPEO_API_TOKEN=${MAPEO_API_TOKEN}
+      - GITHUB_PAT=${GITHUB_PAT}
     volumes:
       - mapeo_api_data:/data
+      - ../config:/config:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:${MAPEO_API_PUERTO_CONTENEDOR}/health"]
       interval: 10s

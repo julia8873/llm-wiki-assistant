@@ -6,6 +6,7 @@ El núcleo del sistema llm-wiki-assistant confía en una arquitectura desacoplad
 Se eligió la **Opción B (Microservicio FastAPI)** en lugar de una tabla nativa de Moodle por las siguientes razones:
 - **Desacoplamiento Estricto**: Moodle (`block_bdc`) y el Bot (`maubot`) acceden a un almacén central agnóstico por HTTP. Ninguno necesita credenciales de base de datos del otro.
 - **Seguridad**: El microservicio no publica su puerto al exterior ni al *host*; solo es accesible dentro de la red interna de contenedores `docker-compose.yml`. Además, se protege con un token de acceso compartido (`MAPEO_API_TOKEN`). El contenedor `mapeo-api` valida este token durante el arranque; si detecta que está vacío o que contiene valores por defecto (`changeme`, `default_token`), la aplicación abortará inmediatamente con un error fatal en los logs para evitar exponer una API desprotegida en producción.
+- **Integración con GitHub**: El PAT de GitHub se lee desde la variable de entorno `GITHUB_PAT`, que se genera automáticamente desde `config/config.yaml` y no necesita declararse manualmente en los `.env.example`.
 
 ## Almacenamiento y Backup
 El servicio utiliza **SQLite** y la base de datos reside en el volumen nombrado `mapeo_api_data` definido en Docker Compose, el cual se monta en `/data` dentro del contenedor.

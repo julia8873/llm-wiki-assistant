@@ -1,3 +1,10 @@
+"""! @file db.py
+@brief Configuración de la base de datos (SQLAlchemy).
+
+Se encarga de la conexión a la base de datos local (SQLite por defecto)
+y de la definición del ORM para la tabla de mapeos.
+"""
+
 from sqlalchemy import Column, Integer, String, DateTime, UniqueConstraint, create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 from datetime import datetime
@@ -11,6 +18,11 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 class MapeoDB(Base):
+    """!
+    @brief Modelo ORM para la tabla 'mapeos'.
+    @details Mantiene la relación entre un estudiante de Moodle (por su curso) y
+    sus correspondientes recursos externos (GitHub y Matrix).
+    """
     __tablename__ = "mapeos"
     __table_args__ = (
         UniqueConstraint("moodle_user_id", "moodle_course_id", name="uq_user_course"),
@@ -19,8 +31,9 @@ class MapeoDB(Base):
     id = Column(Integer, primary_key=True, index=True)
     moodle_user_id = Column(Integer, nullable=False)
     moodle_course_id = Column(Integer, nullable=False)
-    github_fork_url = Column(String, nullable=False)
-    matrix_room_id = Column(String, nullable=False)
+    github_repo_url = Column(String, nullable=True)
+    matrix_room_id = Column(String, nullable=True)
+    estado = Column(String, default="PENDIENTE_GITHUB")
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

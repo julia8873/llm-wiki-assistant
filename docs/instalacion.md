@@ -24,13 +24,23 @@ Flujo de ejecución interno:
 3. **Validación (Healthcheck)**: Realiza un *polling* sobre los contenedores clave (especialmente Moodle) esperando a que reporten estado "Healthy".
 4. **Pruebas de Integración**: Se puede probar la respuesta HTTP final ejecutando `./moodle-matrix-dev/scripts/test-services.sh`.
 
+### Ejecución sin entorno virtual
+No necesitas crear un entorno virtual para trabajar con este proyecto. Desde la carpeta del microservicio puedes instalar las dependencias directamente con el intérprete del sistema:
+
+```bash
+cd moodle-matrix-dev/mapeo-api
+python -m pip install -r requirements.txt
+```
+
+Luego puedes ejecutar la API o las pruebas con `python` sin depender de `venv`.
+
 ### Configuración del Motor LLM
 El sistema permite cambiar en caliente entre 3 proveedores modificando el campo `llm.proveedor_activo` en `config/config.yaml`:
 1. **`openai`** (por defecto): API externa (gpt-4o-mini).
 2. **`gemini`**: API externa Google (gemini-1.5-flash).
 3. **`ollama`**: Inferencia local.
 
-*Nota: Asegúrate de rellenar los tokens correspondientes en `moodle-matrix-dev/.env`.*
+*Nota: El token de GitHub se obtiene desde `config/config.yaml` y se inyecta automáticamente como `GITHUB_PAT` en `moodle-matrix-dev/.env` por `instalar.sh`; no es necesario definirlo manualmente en los `.env.example`.*
 
 ### Inferencia Local (Ollama)
 Si seleccionas `ollama` y deseas ejecutar el motor localmente, debes indicarlo explícitamente al levantar la infraestructura (ya que está apagado por defecto para ahorrar recursos):

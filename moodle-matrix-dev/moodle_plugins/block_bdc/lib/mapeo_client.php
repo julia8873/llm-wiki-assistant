@@ -63,16 +63,18 @@ class block_bdc_mapeo_client {
     }
 
     /**
-     * Crea un nuevo mapeo en la base de datos central.
+     * Llama al microservicio central para registrar un nuevo alumno-curso y aprovisionar en GitHub.
      *
-     * @param int $userid
-     * @param int $courseid
-     * @param string $github_url
-     * @param string $matrix_room
-     * @return array Resultado de la API.
+     * @param int $userid ID de usuario en Moodle.
+     * @param int $courseid ID del curso en Moodle.
+     * @param string $github_url URL base de Github (ahora manejada por la API central, enviar vacío).
+     * @param string $matrix_room ID de sala en Matrix generado por Synapse Admin API.
+     * @param string $username Username del usuario en Moodle para generar el repositorio [asignatura]-[usuario].
+     * @param string $course_shortname Nombre corto del curso para usar como base del repositorio template.
+     * @return array Resultado de la API devolviendo el mapeo generado.
      * @throws moodle_exception Si hay un error, como un 409 Conflict.
      */
-    public function create_mapeo($userid, $courseid, $github_url, $matrix_room) {
+    public function create_mapeo($userid, $courseid, $github_url, $matrix_room, $username = "", $course_shortname = "") {
         $curl = new \curl(['ignoresecurity' => true]);
         $curl->setHeader('Authorization: Bearer ' . $this->token);
         $curl->setHeader('Content-Type: application/json');
@@ -80,8 +82,10 @@ class block_bdc_mapeo_client {
         $payload = json_encode([
             'moodle_user_id' => (int)$userid,
             'moodle_course_id' => (int)$courseid,
-            'github_fork_url' => $github_url,
-            'matrix_room_id' => $matrix_room
+            'github_repo_url' => $github_url,
+            'matrix_room_id' => $matrix_room,
+            'moodle_username' => $username,
+            'moodle_course_shortname' => $course_shortname
         ]);
         
         $url = $this->baseurl . '/mapeos';

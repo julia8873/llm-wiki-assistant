@@ -54,7 +54,7 @@ github:
   url_plantilla: "https://github.com/julia8873/BdC-template"
   rama_defecto: "main"
   api_base_url: "https://api.github.com"
-  pat_env_var: "GITHUB_PAT"
+  pat: "ghp_CHANGE_ME"
 
 llm:
   proveedor_activo: "openai"

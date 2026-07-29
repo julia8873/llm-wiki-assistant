@@ -4,6 +4,7 @@
 El sistema aísla la información de cada alumno para evitar contaminación cruzada de datos (LLM hallucination) y preservar la estricta privacidad del estudiante.
 
 - **Asignación 1:1**: 1 Alumno <--> 1 Fork GitHub <--> 1 Sala Matrix.
+- **Configuración centralizada**: El PAT de GitHub vive en `config/config.yaml` y se propaga automáticamente a `GITHUB_PAT` en el entorno Docker mediante `instalar.sh`, evitando duplicidades con `.env.example`.
 - **Lectura Restringida**: Maubot opera bajo credenciales limitadas exclusivamente al fork vinculado a la sala de ejecución, impidiendo el acceso a repositorios de otros estudiantes.
 
 ## Mapa de Servicios (Puertos)

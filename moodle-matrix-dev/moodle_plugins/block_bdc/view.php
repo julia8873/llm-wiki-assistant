@@ -59,12 +59,12 @@ if ($lock) {
         
         $room_id = $synapse_client->create_room($alias, $matrix_user_id);
         
-        // URL ficticia o inicial para GitHub (Fase 4 se encargará de esto)
-        $github_url = 'https://github.com/placeholder/repo.git';
+        // Ya no enviamos un placeholder, la API de mapeo lo provisiona
+        $github_url = '';
         
         // Guardar mapeo en la BD central
         try {
-            $mapeo_client->create_mapeo($userid, $courseid, $github_url, $room_id);
+            $mapeo_client->create_mapeo($userid, $courseid, $github_url, $room_id, $USER->username, $course->shortname);
         } catch (\moodle_exception $e) {
             // Fallback (Capa 2 de idempotencia): Si el API devuelve 409 Conflict a pesar del lock
             // significa que la sala se creó, atrapamos el error, recuperamos la info real y avanzamos.

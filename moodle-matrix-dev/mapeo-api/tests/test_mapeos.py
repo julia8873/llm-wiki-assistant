@@ -38,7 +38,7 @@ def test_create_and_read_mapeo(client: TestClient):
     response = client.post("/mapeos", json={
         "moodle_user_id": 10,
         "moodle_course_id": 5,
-        "github_fork_url": "https://github.com/user/fork1",
+        "github_repo_url": "https://github.com/user/fork1",
         "matrix_room_id": "!room1:matrix.org"
     }, headers=headers)
     assert response.status_code == 201

@@ -27,8 +27,12 @@ Sistema integrado de docencia Moodle-Matrix-GitHub. Proporciona a cada estudiant
 ```
 
 ## Arquitectura y Componentes
+
+> El proyecto puede ejecutarse con el intérprete del sistema sin crear un entorno virtual. Para instalar las dependencias del microservicio, ejecuta:
+>
+> `cd moodle-matrix-dev/mapeo-api && python -m pip install -r requirements.txt`
 - **Moodle (LMS)**: Orquestador de repositorios.
-- **GitHub**: Almacenamiento OKF por alumno.
+- **GitHub**: Almacenamiento OKF por alumno, con el PAT centralizado en `config/config.yaml` y propagado automáticamente a `GITHUB_PAT` por `instalar.sh` al generar [moodle-matrix-dev/.env](moodle-matrix-dev/.env).
 - **Matrix/Synapse**: Servidor de chat 1:1.
 - **Maubot**: Agente LLM aislado.
 

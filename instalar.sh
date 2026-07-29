@@ -122,6 +122,10 @@ cmd_install_all() {
   cmd_up "$@"
   echo ""
 
+  echo "--- Fase: Provisión de Repositorios (Fase 4) ---"
+  cmd_git "ecuaciones_diferenciales_II" "julia8873"
+  echo ""
+
   echo "--- Fase: Servidor de Documentación (Doxygen) ---"
   check_docker
   echo "=== Secuencia Completada ==="
@@ -176,6 +180,16 @@ generate_env() {
     /^  [a-zA-Z_]+:/ { section=toupper($1); gsub(/ |:/, "", section) }
     /^    [a-zA-Z_]+:/ { key=toupper($1); gsub(/ |:/, "", key); val=$2; gsub(/"/, "", val); print section"_"key"="val }
   ' "${CONFIG_FILE}" >> "${env_file}.tmp"
+
+  local github_pat
+  github_pat=$(awk '
+    /^github:/ { in_github=1; next }
+    in_github && /^  pat:/ { sub(/^  pat: /, "", $0); gsub(/"/, "", $0); print; exit }
+    in_github && /^[^ ]/ { exit }
+  ' "${CONFIG_FILE}")
+  if [[ -n "$github_pat" ]]; then
+    echo "GITHUB_PAT=${github_pat}" >> "${env_file}.tmp"
+  fi
   
   echo "" >> "${env_file}.tmp"
   echo "# === SECRETOS Y VARIABLES MANUALES ===" >> "${env_file}.tmp"
@@ -289,7 +303,31 @@ cmd_up() {
 cmd_down()   { error "Comando 'down' pendiente (Fase 1)."; }
 cmd_logs()   { error "Comando 'logs' pendiente (Fase 1)."; }
 cmd_status() { error "Comando 'status' pendiente (Fase 1)."; }
-cmd_git()    { error "Comando 'git setup' pendiente (Fase 1)."; }
+## @fn cmd_git()
+## @brief Configura el repositorio oficial en GitHub usando un contenedor Python efímero.
+cmd_git() {
+  local asignatura="${1:-}"
+  local profesores="${2:-}"
+  
+  if [[ -z "$asignatura" || -z "$profesores" ]]; then
+    # Valores por defecto para la instalación automática
+    asignatura="ecuaciones_diferenciales_II"
+    profesores="julia8873"
+    warn "No se pasaron argumentos a 'git'. Usando por defecto: ${asignatura} / ${profesores}"
+  fi
+  
+  info "Aprovisionando repositorio oficial en GitHub para: ${asignatura}..."
+  check_docker
+  
+  # Levanta un contenedor efímero, instala dependencias al vuelo y ejecuta el script
+  docker run --rm \
+    -v "${ROOT_DIR}:/app" \
+    -w /app \
+    python:3.11-slim \
+    sh -c "pip install --quiet httpx pyyaml && python moodle-matrix-dev/scripts/configurar_bdc_core.py \"$asignatura\" $profesores"
+    
+  ok "Repositorio maestro configurado con éxito en GitHub."
+}
 cmd_bot()    { error "Comando 'bot sync' pendiente (Fase 3)."; }
 
 ## @fn main()

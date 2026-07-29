@@ -1,3 +1,10 @@
+"""! @file main.py
+@brief Aplicación principal FastAPI para el Mapeo de Salas y Repositorios.
+
+Punto de entrada de la API que coordina Moodle, Matrix (Synapse) y GitHub,
+almacenando el estado en una base de datos local de SQLite/MariaDB.
+"""
+
 import os
 from typing import List, Optional
 from fastapi import FastAPI, Depends, HTTPException, status
@@ -5,8 +12,9 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
-from .models import MapeoCreate, MapeoRead
+from .models import MapeoCreate, MapeoRead, MapeoEstado
 from .db import create_db_and_tables, get_session, MapeoDB
+from .services.github_service import provisionar_repositorio_alumno, GitHubProvisionError
 
 app = FastAPI(title="Mapeo API", description="API centralizada para la relación Alumno-Curso-Fork-Sala")
 
@@ -37,19 +45,57 @@ def health_check():
     return {"status": "ok"}
 
 @app.post("/mapeos", response_model=MapeoRead, status_code=status.HTTP_201_CREATED)
-def create_mapeo(mapeo: MapeoCreate, session: Session = Depends(get_session), token: str = Depends(verify_token)):
-    db_mapeo = MapeoDB(**mapeo.dict())
+async def create_mapeo(mapeo: MapeoCreate, session: Session = Depends(get_session), token: str = Depends(verify_token)):
+    """!
+    @brief Crea un nuevo mapeo y aprovisiona el repositorio en GitHub.
+    @details
+    Endpoint llamado por Moodle cuando un alumno accede por primera vez al bloque BdC.
+    Se asegura de que no existan mapeos duplicados para el mismo usuario y curso.
+    Invoca asíncronamente a `provisionar_repositorio_alumno` para interactuar con la API de GitHub.
+    
+    @param mapeo MapeoCreate Datos enviados desde el bloque de Moodle.
+    @param session Session Sesión de la base de datos inyectada por FastAPI.
+    @param token str Token de autenticación inyectado por FastAPI.
+    @return MapeoRead Entidad creada con el ID, repositorio asignado y estado.
+    """
+    db_mapeo = MapeoDB(
+        moodle_user_id=mapeo.moodle_user_id,
+        moodle_course_id=mapeo.moodle_course_id,
+        matrix_room_id=mapeo.matrix_room_id,
+        estado=MapeoEstado.PENDIENTE_GITHUB
+    )
+    
     try:
         session.add(db_mapeo)
         session.commit()
         session.refresh(db_mapeo)
-        return db_mapeo
     except IntegrityError:
         session.rollback()
         raise HTTPException(
             status_code=409,
             detail="Ya existe un mapeo para este usuario y curso."
         )
+
+    # Si se nos provee nombre de usuario y asignatura, aprovisionamos GitHub
+    if mapeo.moodle_username and mapeo.moodle_course_shortname:
+        try:
+            repo_url = await provisionar_repositorio_alumno(
+                asignatura=mapeo.moodle_course_shortname,
+                usuario=mapeo.moodle_username
+            )
+            # Actualizamos BD con éxito
+            db_mapeo.github_repo_url = repo_url
+            db_mapeo.estado = MapeoEstado.ACTIVO
+            session.commit()
+            session.refresh(db_mapeo)
+        except GitHubProvisionError as e:
+            # Queda guardado como PENDIENTE_GITHUB, pero devolvemos 502 al cliente (Moodle)
+            raise HTTPException(
+                status_code=502,
+                detail=f"Fallo al aprovisionar GitHub: {str(e)}"
+            )
+
+    return db_mapeo
 
 @app.get("/mapeos", response_model=List[MapeoRead])
 def read_mapeos(
