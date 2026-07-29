@@ -1,40 +1,33 @@
 # ==============================================================================
-# PLANTILLA DE INSTANCIA DE CONFIGURACIÓN DEL PLUGIN MAUBOT (config.yaml.example)
+# PLANTILLA config.yaml — Plugin llm-wiki-assistant en Maubot
+# Copia a moodle-matrix-dev/maubot/config.yaml y rellena los secretos.
 # ==============================================================================
-# Instancia del plugin llm-wiki-assistant cargado en Maubot
-# Copiar a moodle-matrix-dev/maubot/config.yaml
-# ==============================================================================
-
 homeserver:
   url: "http://matrix-synapse:8008"
   server_name: "localhost"
 
 bot_user:
   mxid: "@llm_wiki_bot:localhost"
-  access_token: "syt_llm_wiki_bot_access_token_placeholder"
+  access_token: "syt_CHANGE_ME"
 
-# Parámetros del plugin llm-wiki-assistant
 plugin_config:
-  github_pat: "ghp_your_github_token_here"
+  github_pat: "ghp_CHANGE_ME"
   github_org: "julia8873"
   default_branch: "main"
-  
-  # Proveedor LLM activo: "openai" (defecto), "gemini" u "ollama" (opcional local)
+
+  # Proveedor LLM activo: "openai" (defecto) | "gemini" | "ollama"
   llm_provider: "openai"
-  
-  # Configuración OpenAI (para gpt-4o, gpt-4o-mini, o3-mini, vLLM, LM Studio, etc.)
-  openai_api_key: "sk-your_openai_api_key_here"
+
+  openai_api_key: "sk-CHANGE_ME"
   openai_base_url: "https://api.openai.com/v1"
   openai_model: "gpt-4o-mini"
 
-  # Configuración Gemini API
-  gemini_api_key: "AIzaSy_your_gemini_api_key_here"
+  gemini_api_key: "AIzaSy_CHANGE_ME"
   gemini_base_url: "https://generativelanguage.googleapis.com/v1beta"
   gemini_model: "gemini-1.5-flash"
 
-  # Configuración Ollama Local (opcional)
   ollama_base_url: "http://ollama-llm-service:11434"
   ollama_model: "llama3"
 
   moodle_api_url: "http://moodle-matrix-dev-moodle-1:8000"
-  moodle_wstoken: "moodle_web_service_token_placeholder"
+  moodle_wstoken: "CHANGE_ME"

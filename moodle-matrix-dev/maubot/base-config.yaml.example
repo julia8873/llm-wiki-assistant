@@ -1,0 +1,31 @@
+# ==============================================================================
+# PLANTILLA base-config.yaml — Servidor Maubot
+# Copia a moodle-matrix-dev/maubot/base-config.yaml y rellena los secretos.
+# ==============================================================================
+server:
+  hostname: "localhost"
+  port: 29317
+  public_url: "http://localhost:29317"
+
+# Base de datos principal de Maubot (instancias de bots, plugins, logs)
+database: "sqlite:////data/maubot.db"
+
+# ------------------------------------------------------------------------------
+# Cifrado E2EE (Olm/Megolm) — REQUERIDO en producción
+# ------------------------------------------------------------------------------
+# El bot participa en salas cifradas como un dispositivo Matrix más.
+# Maubot persiste su cuenta Olm (claves públicas/privadas) en `account_storage`.
+# `pickle_key` cifra ese store en disco: sin esta clave, el fichero .db robado
+# es ilegible. Genera un valor aleatorio seguro, por ejemplo con:
+#   python3 -c "import secrets; print(secrets.token_hex(32))"
+# NUNCA uses el mismo pickle_key en dos instancias distintas del bot.
+crypto:
+  pickle_key: "CHANGE_ME_GENERATE_WITH: python3 -c \"import secrets; print(secrets.token_hex(32))\""
+  account_storage: "sqlite:////data/crypto.db"
+
+plugin_system:
+  directory: "/data/plugins"
+
+# Contraseña del administrador de la interfaz web de Maubot
+admins:
+  admin: "CHANGE_ME_PASSWORD"

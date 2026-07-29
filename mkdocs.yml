@@ -1,0 +1,56 @@
+site_name: Documentación LLM Wiki Assistant
+site_description: Entorno docente Moodle-Matrix-GitHub-LLM (Modelo Alumno-Fork-Sala)
+site_author: julia8873
+repo_url: https://github.com/julia8873/llm-wiki-assistant
+repo_name: julia8873/llm-wiki-assistant
+
+theme:
+  name: material
+  language: es
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Cambiar a modo oscuro
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Cambiar a modo claro
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - attr_list
+
+nav:
+  - Portada: index.md
+  - Arquitectura: arquitectura.md
+  - Instalación: instalacion.md
+  - Mapeo Alumno-Fork-Sala: mapeo-alumno-fork.md
+  - Bot Maubot: bot.md
+  - Seguridad y Credenciales: seguridad.md

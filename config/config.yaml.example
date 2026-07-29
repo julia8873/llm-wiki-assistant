@@ -35,6 +35,12 @@ servicios:
     puerto_contenedor: 29317
     url_base: "http://localhost:29317"
 
+  docs:
+    nombre_contenedor: "llm-wiki-docs"
+    puerto_host: 8005
+    puerto_contenedor: 8000
+    url_base: "http://localhost:8005"
+
   llm_server_opcional:
     activar_perfil_ollama_local: false
     nombre_contenedor: "ollama-llm-service"
@@ -51,7 +57,6 @@ github:
   pat_env_var: "GITHUB_PAT"
 
 llm:
-  # Proveedor activo por defecto: "openai" ("openai" | "gemini" | "ollama")
   proveedor_activo: "openai"
 
   openai:

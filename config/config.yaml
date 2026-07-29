@@ -3,7 +3,7 @@
 # ==============================================================================
 # Este fichero es la ÚNICA FUENTE DE VERDAD (Single Source of Truth) para la
 # parametrización de todos los componentes de la arquitectura:
-#   - Contenedores Docker y servicios de red (con perfil opcional para Ollama)
+#   - Contenedores Docker y servicios de red (incluyendo servidor de documentación)
 #   - Integración GitHub (Organización, Plantilla BdC y API)
 #   - Motor LLM con 3 proveedores intercambiables: OpenAI (defecto), Gemini u Ollama
 #   - Estructura y rutas del formato Open Knowledge Format (OKF) en el fork
@@ -52,6 +52,13 @@ servicios:
     puerto_contenedor: 29317
     url_base: "http://localhost:29317"
 
+  # Servidor de Documentación MkDocs (Fase 0.1)
+  docs:
+    nombre_contenedor: "llm-wiki-docs"
+    puerto_host: 8005
+    puerto_contenedor: 8000
+    url_base: "http://localhost:8005"
+
   # Proveedor de Inferencia LLM Local OPCIONAL (desactivado por defecto; perfil Docker "ollama")
   llm_server_opcional:
     activar_perfil_ollama_local: false
@@ -83,20 +90,11 @@ github:
 # ------------------------------------------------------------------------------
 # 3. MOTOR LLM Y CONFIGURACIÓN DE INFERENCIA (3 PROVEEDORES INTERCAMBIABLES)
 # ------------------------------------------------------------------------------
-# NOTA: Cambiar de proveedor se realiza EXCLUSIVAMENTE modificando `proveedor_activo`
-# ("openai", "gemini" u "ollama"). Ningún código requiere modificaciones.
 llm:
-  # Proveedor activo por defecto: "openai" (OpenAI o cualquier endpoint compatible con su API REST)
-  # Opciones válidas: "openai" | "gemini" | "ollama"
+  # Proveedor activo por defecto: "openai" ("openai" | "gemini" | "ollama")
   proveedor_activo: "openai"
 
-  # ----------------------------------------------------------------------------
   # 3.1. PROVEEDOR OPENAI (OPCIÓN POR DEFECTO - REST PROTOCOL /chat/completions)
-  # ----------------------------------------------------------------------------
-  # Cliente genérico compatible con la API REST estándar de OpenAI.
-  # Al implementar el protocolo estándar (/chat/completions con esquema de mensajes),
-  # se puede usar con OpenAI (gpt-4o, gpt-4o-mini, o3-mini, o1), Azure OpenAI,
-  # LM Studio, vLLM, DeepSeek o cualquier proxy compatible simplemente cambiando `api_base_url`.
   openai:
     modelo_defecto: "gpt-4o-mini"
     api_key_env_var: "OPENAI_API_KEY"
@@ -105,12 +103,7 @@ llm:
     max_tokens: 1024
     top_p: 0.95
 
-  # ----------------------------------------------------------------------------
-  # 3.2. PROVEEDOR GOOGLE GEMINI (API EXTERNA CON PROTOCOLO PROPIETARIO)
-  # ----------------------------------------------------------------------------
-  # API de Google (generativelanguage.googleapis.com). Utiliza un esquema propio
-  # de petición/respuesta (contents/parts) y autenticación distinta a OpenAI, por lo
-  # que requiere su propio cliente en el plugin.
+  # 3.2. PROVEEDOR GOOGLE GEMINI
   gemini:
     modelo_defecto: "gemini-1.5-flash"
     api_key_env_var: "GEMINI_API_KEY"
@@ -119,11 +112,7 @@ llm:
     max_tokens: 1024
     top_p: 0.95
 
-  # ----------------------------------------------------------------------------
   # 3.3. PROVEEDOR OLLAMA (INFERENCIA LOCAL OPCIONAL)
-  # ----------------------------------------------------------------------------
-  # Proveedor local (http://localhost:11434 por defecto) instalable opcionalmente
-  # mediante el perfil Docker "ollama" para despliegues 100% offline o sin APIs externas.
   ollama:
     modelo_defecto: "llama3"
     api_base_url: "http://localhost:11434"
@@ -142,19 +131,16 @@ llm:
 # 4. CONVENCIONES Y RUTAS DEL FORMATO OPEN KNOWLEDGE FORMAT (OKF)
 # ------------------------------------------------------------------------------
 okf:
-  # Directorios requeridos dentro del repositorio fork del alumno
   directorios:
     conceptos: "conceptos/"
     bitacora: "bitacora/"
     recursos: "recursos/"
 
-  # Archivos específicos esperados
   ficheros:
     log_bot: "log.md"
     indice_principal: "index.md"
     readme: "README.md"
 
-  # Extensiones permitidas para lectura del bot
   extensiones_permitidas:
     - ".md"
     - ".markdown"
@@ -173,8 +159,6 @@ red_timeouts:
 # ------------------------------------------------------------------------------
 # 6. TABLA DE MAPEO CENTRAL (MOODLE BLOCK BDC - INDEPENDIENTE DEL NATIVO DE MOODLE)
 # ------------------------------------------------------------------------------
-# NOTA: Moodle incluye communication/provider/matrix (1 sala por CURSO).
-# block_bdc NO intercepta ese módulo; crea sus propias salas 1:1 por ALUMNO.
 mapeo_bdc:
   nombre_tabla: "mdl_block_bdc_mapping"
   campos:

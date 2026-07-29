@@ -1,0 +1,47 @@
+# ==========================================
+# Secretos y Variables de Entorno
+# ==========================================
+.env
+*.env
+!*.env.example
+
+# Secretos de Maubot
+moodle-matrix-dev/maubot/config.yaml
+moodle-matrix-dev/maubot/base-config.yaml
+!moodle-matrix-dev/maubot/*.example
+
+# ==========================================
+# Datos de Ejecución de Contenedores y DBs
+# ==========================================
+moodle-matrix-dev/homeserver.db
+moodle-matrix-dev/synapse-data/
+moodle-matrix-dev/maubot/data/
+moodle-matrix-dev/maubot/*.db
+moodle_data/
+mariadb_data/
+
+# ==========================================
+# Python
+# ==========================================
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# ==========================================
+# MkDocs (sitio generado)
+# ==========================================
+site/
+
+# ==========================================
+# Sistema operativo y Editores
+# ==========================================
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
