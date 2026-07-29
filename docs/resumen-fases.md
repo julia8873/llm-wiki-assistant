@@ -125,14 +125,13 @@ Esta fase cerró el ciclo de automatización entre Moodle, el microservicio de m
 
 ### Desarrollo e Implementación
 - **Centralización del Token GitHub**: El PAT se movió a `config/config.yaml` y el script `instalar.sh` genera automáticamente `moodle-matrix-dev/.env` inyectando la variable `GITHUB_PAT` para que el stack y los scripts puedan reutilizarla sin depender de secretos dispersos.
-- **Provisionamiento del repositorio maestro de curso**: Se implementó `moodle-matrix-dev/scripts/configurar_bdc_core.py`, que usa la API REST de GitHub para:
-  - crear un repositorio oficial de asignatura a partir de un template base,
-  - marcarlo como `is_template=true`,
-  - añadir profesores como colaboradores con permisos `maintain`,
-  - ignorar de forma explícita el caso en el que el usuario a añadir coincide con el propietario del repositorio.
-- **Aprovisionamiento de repositorios de alumno**: Se amplió `moodle-matrix-dev/mapeo-api/app/services/github_service.py` para que, al crear un mapeo de alumno, se verifique si el repositorio ya existe y, si no, se genere desde el template oficial mediante el endpoint `/generate` manteniendo un comportamiento idempotente.
-- **Integración con FastAPI y Settings**: El servicio de GitHub ahora lee la configuración desde `GITHUB_PAT` y desde la configuración cargada por `app/core/config.py`, facilitando el despliegue tanto en Docker como en pruebas locales.
-- **Automatización del flujo de instalación**: El comando `./instalar.sh git` ejecuta el provisionamiento de GitHub en un contenedor efímero de Python, lo que permite escalar el proceso sin exigir un entorno virtual local.
+- **Aprovisionamiento Automático desde Moodle**: Se integró en la API Mapeo el endpoint `POST /cursos`. El bloque de Moodle (`block_bdc`) ahora registra un observador de eventos (`\core\event\course_created`) que intercepta la creación de cursos en la plataforma.
+  - Al detectar un nuevo curso, Moodle envía una petición HTTP a la API.
+  - La API se encarga de aprovisionar dinámicamente en GitHub el repositorio oficial (`<Asignatura>-Oficial`) a partir de la plantilla maestro (`BdC-template`).
+  - La API marca el repositorio resultante como `is_template=true`.
+  - El resultado de la operación se devuelve de forma síncrona, y Moodle inyecta notificaciones nativas (`success`/`error`) en la interfaz para informar al administrador del LMS en tiempo real.
+- **Aprovisionamiento de repositorios de alumno**: Se amplió `moodle-matrix-dev/mapeo-api/app/services/github_service.py` para que, al acceder un alumno a la sala por primera vez, el sistema provisione un fork a partir de la plantilla recién generada.
+- **Integración con FastAPI y Settings**: El servicio de GitHub lee la configuración desde `GITHUB_PAT` y desde `app/core/config.py`, facilitando la portabilidad.
 
 ### Pruebas Realizadas
 - **Suite de pruebas del servicio GitHub**: Se añadió `moodle-matrix-dev/mapeo-api/tests/test_github_service.py` con pruebas que cubren:
@@ -145,3 +144,12 @@ Esta fase cerró el ciclo de automatización entre Moodle, el microservicio de m
 
 ### Resultado Obtenido
 El proyecto ya permite completar el ciclo completo de aprovisionamiento de repositorios en GitHub desde la instalación base, reduciendo la intervención manual y dejando preparada la infraestructura para el siguiente escalado en entornos reales de aula.
+
+### Prueba Manual de Moodle
+Para validar el flujo completo desde la interfaz, se puede crear manualmente un usuario de prueba en Moodle con los siguientes datos:
+- Nombre de usuario: `student1`
+- Contraseña: `Student1!`
+- Nombre completo: `Student One`
+- Correo electrónico: `student1@example.com`
+
+Una vez creado, se matricula en un curso de prueba y se ejecuta la acción del bloque BDC desde esa cuenta para comprobar que se genera el mapeo y el repositorio asociado.

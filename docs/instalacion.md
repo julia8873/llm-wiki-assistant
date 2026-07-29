@@ -48,6 +48,22 @@ Si seleccionas `ollama` y deseas ejecutar el motor localmente, debes indicarlo e
 ./instalar.sh up --ollama
 ```
 
+### Pruebas manuales en Moodle
+Para validar el flujo completo desde la interfaz, es necesario iniciar sesión en Moodle y ejecutar la acción del bloque BDC desde un curso visible.
+
+1. Acceder a Moodle como administrador.
+2. Crear o abrir un curso de prueba.
+3. Crear manualmente un usuario de prueba desde la interfaz de Moodle con los siguientes datos:
+   - Nombre de usuario: `student1`
+   - Contraseña: `Student1!`
+   - Nombre completo: `Student One`
+   - Correo electrónico: `student1@example.com`
+4. Matricular ese usuario en el curso de prueba.
+5. Iniciar sesión con ese usuario y ejecutar la acción del bloque.
+6. Comprobar la creación del mapeo y del repositorio asociado.
+
+> Nota: este usuario se ha creado manualmente en Moodle para realizar pruebas de integración del flujo actual.
+
 ### Comandos de Operación
 | Comando | Acción |
 |---|---|

@@ -9,7 +9,7 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2026072903;    // The current module version (Date: YYYYMMDDXX).
+$plugin->version   = 2026072904;    // The current module version (Date: YYYYMMDDXX).
 $plugin->requires  = 2022041900;    // Requires this Moodle version (4.0+).
 $plugin->component = 'block_bdc';   // Full name of the plugin (used for diagnostics).
 $plugin->maturity  = MATURITY_ALPHA;

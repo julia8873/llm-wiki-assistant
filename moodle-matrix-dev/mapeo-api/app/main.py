@@ -12,9 +12,9 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
-from .models import MapeoCreate, MapeoRead, MapeoEstado
+from .models import MapeoCreate, MapeoRead, MapeoEstado, CursoCreate
 from .db import create_db_and_tables, get_session, MapeoDB
-from .services.github_service import provisionar_repositorio_alumno, GitHubProvisionError
+from .services.github_service import provisionar_repositorio_alumno, provisionar_repositorio_oficial, GitHubProvisionError
 
 app = FastAPI(title="Mapeo API", description="API centralizada para la relación Alumno-Curso-Fork-Sala")
 
@@ -123,3 +123,19 @@ def get_by_room(matrix_room_id: str, session: Session = Depends(get_session), to
     if not result:
         raise HTTPException(status_code=404, detail="Mapeo no encontrado para esta sala")
     return result
+
+@app.post("/cursos", status_code=status.HTTP_201_CREATED)
+async def create_curso(curso: CursoCreate, token: str = Depends(verify_token)):
+    """!
+    @brief Aprovisiona la plantilla oficial del curso en GitHub.
+    @details
+    Endpoint llamado por Moodle al crear un curso nuevo.
+    """
+    try:
+        repo_url = await provisionar_repositorio_oficial(curso.moodle_course_shortname)
+        return {"status": "ok", "github_repo_url": repo_url}
+    except GitHubProvisionError as e:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Fallo al aprovisionar plantilla oficial en GitHub: {str(e)}"
+        )

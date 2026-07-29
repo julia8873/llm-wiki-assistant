@@ -45,3 +45,9 @@ class MapeoRead(MapeoBase):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+class CursoCreate(BaseModel):
+    """!
+    @brief Modelo para la provisión del repositorio oficial de un curso.
+    """
+    moodle_course_shortname: str

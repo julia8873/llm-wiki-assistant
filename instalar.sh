@@ -122,9 +122,6 @@ cmd_install_all() {
   cmd_up "$@"
   echo ""
 
-  echo "--- Fase: Provisión de Repositorios (Fase 4) ---"
-  cmd_git "ecuaciones_diferenciales_II" "julia8873"
-  echo ""
 
   echo "--- Fase: Servidor de Documentación (Doxygen) ---"
   check_docker
@@ -310,10 +307,7 @@ cmd_git() {
   local profesores="${2:-}"
   
   if [[ -z "$asignatura" || -z "$profesores" ]]; then
-    # Valores por defecto para la instalación automática
-    asignatura="ecuaciones_diferenciales_II"
-    profesores="julia8873"
-    warn "No se pasaron argumentos a 'git'. Usando por defecto: ${asignatura} / ${profesores}"
+    error "Debe pasarse la asignatura y los profesores como argumentos. Ejemplo: ./instalar.sh git mi_asignatura profesor1"
   fi
   
   info "Aprovisionando repositorio oficial en GitHub para: ${asignatura}..."
