@@ -118,7 +118,8 @@ cmd_install_all() {
   echo ""
 
   echo "--- Fase: Stack Docker ---"
-  warn "Infraestructura Docker (Fase 1) pendiente de implementación."
+  copy_if_missing "${ROOT_DIR}/moodle-matrix-dev/.env.example" "${ROOT_DIR}/moodle-matrix-dev/.env"
+  cmd_up "$@"
   echo ""
 
   echo "--- Fase: Servidor de Documentación (Doxygen) ---"
@@ -161,8 +162,130 @@ cmd_docs() {
   esac
 }
 
-## Funciones Stubs (Fases Futuras)
-cmd_up()     { error "Comando 'up' pendiente (Fase 1)."; }
+### @fn generate_env()
+## @brief Genera el fichero .env combinando config.yaml y .env.example
+generate_env() {
+  local env_file="${ROOT_DIR}/moodle-matrix-dev/.env"
+  local example_file="${ROOT_DIR}/moodle-matrix-dev/.env.example"
+  
+  info "Generando/Actualizando ${env_file} a partir de config.yaml..."
+  
+  # Bloque dinámico
+  echo "# === BLOQUE GENERADO AUTOMÁTICAMENTE DESDE config.yaml ===" > "${env_file}.tmp"
+  awk -F': ' '
+    /^  [a-zA-Z_]+:/ { section=toupper($1); gsub(/ |:/, "", section) }
+    /^    [a-zA-Z_]+:/ { key=toupper($1); gsub(/ |:/, "", key); val=$2; gsub(/"/, "", val); print section"_"key"="val }
+  ' "${CONFIG_FILE}" >> "${env_file}.tmp"
+  
+  echo "" >> "${env_file}.tmp"
+  echo "# === SECRETOS Y VARIABLES MANUALES ===" >> "${env_file}.tmp"
+  
+  # Copiar secretos (preservando existentes si los hay)
+  if [[ -f "$env_file" ]] && grep -q "=== SECRETOS Y VARIABLES MANUALES ===" "$env_file"; then
+    sed -n '/=== SECRETOS Y VARIABLES MANUALES ===/,$p' "$env_file" | tail -n +2 >> "${env_file}.tmp"
+  elif [[ -f "$env_file" ]]; then
+    cat "$env_file" >> "${env_file}.tmp"
+  else
+    cat "$example_file" >> "${env_file}.tmp"
+  fi
+  
+  # Generar MAPEO_API_TOKEN si está en modo default
+  if grep -q "MAPEO_API_TOKEN=changeme" "${env_file}.tmp"; then
+    local new_token=$(openssl rand -hex 16)
+    sed -i "s/MAPEO_API_TOKEN=changeme/MAPEO_API_TOKEN=${new_token}/" "${env_file}.tmp"
+    info "Se ha generado un MAPEO_API_TOKEN aleatorio para esta instancia."
+  else
+    warn "No se encontró el placeholder MAPEO_API_TOKEN=changeme en la configuración. Si no es intencionado, el token podría estar ausente o hardcodeado."
+  fi
+  
+  mv "${env_file}.tmp" "$env_file"
+}
+
+## @fn print_summary()
+## @brief Imprime la tabla resumen de credenciales y URLs
+print_summary() {
+  set +u # Permitir variables no definidas temporalmente
+  source "${ROOT_DIR}/moodle-matrix-dev/.env"
+  set -u
+  
+  echo ""
+  echo "=== RESUMEN DE SERVICIOS (Fase 1) ==="
+  echo "Servicio    URL                              Credenciales"
+  echo "----------------------------------------------------------------"
+  echo "Moodle      http://localhost:${MOODLE_PUERTO_HOST:-8000}           ${MOODLE_USERNAME:-admin} / ${MOODLE_PASSWORD:-adminpass123}"
+  echo "Matrix      http://localhost:${SYNAPSE_PUERTO_HOST:-8008}           -"
+  echo "Element     http://localhost:${ELEMENT_PUERTO_HOST:-8081}           -"
+  echo "Maubot      http://localhost:${MAUBOT_PUERTO_HOST:-29317}          -"
+  echo "Doxygen     http://localhost:8005            -"
+  echo "Mapeo API   http://mapeo-api:8000            (Solo red interna Docker. Token: ${MAPEO_API_TOKEN})"
+  
+  cd "${ROOT_DIR}/moodle-matrix-dev" || true
+  if docker compose ps --services --filter "status=running" 2>/dev/null | grep -q "ollama"; then
+    echo "Ollama      http://localhost:${LLM_SERVER_OPCIONAL_PUERTO_HOST:-11434}          (Perfil Activo)"
+  else
+    echo "Ollama      -                                (Inactivo. Usa --ollama para levantar)"
+  fi
+  cd "${ROOT_DIR}"
+  
+  echo "----------------------------------------------------------------"
+  echo "Proveedores LLM configurados en config/config.yaml."
+  echo ""
+}
+
+# ------------------------------------------------------------------------------
+# Stubs de fases futuras
+# ------------------------------------------------------------------------------
+
+## @fn cmd_up()
+## @brief Levanta la infraestructura de Fase 1
+cmd_up() {
+  local use_ollama=false
+  for arg in "$@"; do
+    if [[ "$arg" == "--ollama" ]]; then
+      use_ollama=true
+    fi
+  done
+  
+  generate_env
+  
+  info "Levantando servicios Docker Compose..."
+  cd "${ROOT_DIR}/moodle-matrix-dev"
+  
+  if [ "$use_ollama" = true ]; then
+    info "Perfil Ollama activado."
+    docker compose --env-file .env --profile ollama up -d
+  else
+    docker compose --env-file .env up -d
+  fi
+  
+  info "Esperando a que Moodle y mapeo-api estén operativos (Healthchecks)..."
+  # Leer el nombre del contenedor dinámico
+  local moodle_container=$(grep MOODLE_NOMBRE_CONTENEDOR .env | cut -d= -f2 || echo "moodle-matrix-dev-moodle-1")
+  local mapeo_api_container=$(grep MAPEO_API_NOMBRE_CONTENEDOR .env | cut -d= -f2 || echo "moodle-matrix-dev-mapeo-api-1")
+  
+  while true; do
+    local m_status=$(docker inspect --format="{{if .State.Health}}{{.State.Health.Status}}{{end}}" "$moodle_container" 2>/dev/null || echo "starting")
+    local api_status=$(docker inspect --format="{{if .State.Health}}{{.State.Health.Status}}{{end}}" "$mapeo_api_container" 2>/dev/null || echo "starting")
+    
+    if [[ "$m_status" == "healthy" && "$api_status" == "healthy" ]]; then
+      ok "Moodle y mapeo-api están operativos."
+      break
+    fi
+    
+    if [[ "$m_status" == "unhealthy" ]]; then
+      error "Moodle falló el healthcheck. Revisa 'docker logs $moodle_container'."
+    fi
+    
+    if [[ "$api_status" == "unhealthy" ]]; then
+      error "mapeo-api falló el healthcheck. Revisa 'docker logs $mapeo_api_container'."
+    fi
+    
+    sleep 5
+  done
+  
+  cd "${ROOT_DIR}"
+  print_summary
+}
 cmd_down()   { error "Comando 'down' pendiente (Fase 1)."; }
 cmd_logs()   { error "Comando 'logs' pendiente (Fase 1)."; }
 cmd_status() { error "Comando 'status' pendiente (Fase 1)."; }

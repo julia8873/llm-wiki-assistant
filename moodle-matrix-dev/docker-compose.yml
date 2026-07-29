@@ -1,60 +1,115 @@
 services:
   mariadb:
     image: mariadb:10.11
-    container_name: moodle-mariadb
+    container_name: ${MARIADB_NOMBRE_CONTENEDOR}
     environment:
-      - MARIADB_USER=bn_moodle
-      - MARIADB_PASSWORD=moodle_db_pass
-      - MARIADB_DATABASE=bitnami_moodle
-      - MARIADB_ROOT_PASSWORD=moodle_root_pass
+      - MARIADB_USER=${MARIADB_USER}
+      - MARIADB_PASSWORD=${MARIADB_PASSWORD}
+      - MARIADB_DATABASE=${MARIADB_DATABASE}
+      - MARIADB_ROOT_PASSWORD=${MARIADB_ROOT_PASSWORD}
     volumes:
       - mariadb_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   moodle:
     image: bitnamilegacy/moodle:latest
-    container_name: moodle-app
+    container_name: ${MOODLE_NOMBRE_CONTENEDOR}
     ports:
-      - "8000:8080"
+      - "${MOODLE_PUERTO_HOST}:${MOODLE_PUERTO_CONTENEDOR}"
     environment:
       - MOODLE_DATABASE_HOST=mariadb
       - MOODLE_DATABASE_PORT_NUMBER=3306
-      - MOODLE_DATABASE_USER=bn_moodle
-      - MOODLE_DATABASE_PASSWORD=moodle_db_pass
-      - MOODLE_DATABASE_NAME=bitnami_moodle
-      - MOODLE_USERNAME=admin
-      - MOODLE_PASSWORD=adminpass123
-      - MOODLE_EMAIL=admin@example.com
-      - MOODLE_SITE_NAME=Moodle Matrix Dev
-      - MOODLE_HOST=localhost:8000
+      - MOODLE_DATABASE_USER=${MARIADB_USER}
+      - MOODLE_DATABASE_PASSWORD=${MARIADB_PASSWORD}
+      - MOODLE_DATABASE_NAME=${MARIADB_DATABASE}
+      - MOODLE_USERNAME=${MOODLE_USERNAME}
+      - MOODLE_PASSWORD=${MOODLE_PASSWORD}
+      - MOODLE_EMAIL=${MOODLE_EMAIL}
+      - MOODLE_SITE_NAME=LLM Wiki Assistant Moodle
+      - MOODLE_HOST=localhost:${MOODLE_PUERTO_HOST}
     depends_on:
-      - mariadb
+      mariadb:
+        condition: service_healthy
     volumes:
       - moodle_data:/bitnami/moodle
       - moodledata_data:/bitnami/moodledata
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/8080'"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 180s
 
   synapse:
     image: matrixdotorg/synapse:latest
-    container_name: matrix-synapse
+    container_name: ${SYNAPSE_NOMBRE_CONTENEDOR}
     ports:
-      - "8008:8008"
+      - "${SYNAPSE_PUERTO_HOST}:${SYNAPSE_PUERTO_CONTENEDOR}"
+    environment:
+      - SYNAPSE_SERVER_NAME=localhost
+      - SYNAPSE_REPORT_STATS=no
     volumes:
       - ./synapse-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8008/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   element:
     image: vectorim/element-web:latest
-    container_name: element-web
+    container_name: ${ELEMENT_NOMBRE_CONTENEDOR}
     ports:
-      - "8081:80"
+      - "${ELEMENT_PUERTO_HOST}:${ELEMENT_PUERTO_CONTENEDOR}"
     volumes:
       - ./element-config.json:/app/config.json:ro
       - ./default.conf.template:/etc/nginx/templates/default.conf.template:ro
     depends_on:
-      - synapse
+      synapse:
+        condition: service_healthy
+
+  mapeo-api:
+    build:
+      context: ./mapeo-api
+    container_name: ${MAPEO_API_NOMBRE_CONTENEDOR}
+    environment:
+      - MAPEO_API_TOKEN=${MAPEO_API_TOKEN}
+    volumes:
+      - mapeo_api_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${MAPEO_API_PUERTO_CONTENEDOR}/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  maubot:
+    image: dock.mau.dev/maubot/maubot:latest
+    container_name: ${MAUBOT_NOMBRE_CONTENEDOR}
+    ports:
+      - "${MAUBOT_PUERTO_HOST}:${MAUBOT_PUERTO_CONTENEDOR}"
+    volumes:
+      - ./maubot:/data
+    depends_on:
+      synapse:
+        condition: service_healthy
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ${LLM_SERVER_OPCIONAL_NOMBRE_CONTENEDOR}
+    profiles:
+      - ollama
+    ports:
+      - "${LLM_SERVER_OPCIONAL_PUERTO_HOST}:${LLM_SERVER_OPCIONAL_PUERTO_CONTENEDOR}"
+    volumes:
+      - ollama_data:/root/.ollama
 
 volumes:
   mariadb_data:
-    driver: local
   moodle_data:
-    driver: local
   moodledata_data:
-    driver: local
+  ollama_data:
+  mapeo_api_data:

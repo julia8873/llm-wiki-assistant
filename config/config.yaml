@@ -59,6 +59,13 @@ servicios:
     puerto_contenedor: 8000
     url_base: "http://localhost:8005"
 
+  # API Central de Mapeo (Fase 2)
+  mapeo_api:
+    nombre_contenedor: "moodle-matrix-dev-mapeo-api-1"
+    puerto_contenedor: 8000
+    # No se publica al host (solo accesible en la red interna de Docker)
+    url_interna: "http://mapeo-api:8000"
+
   # Proveedor de Inferencia LLM Local OPCIONAL (desactivado por defecto; perfil Docker "ollama")
   llm_server_opcional:
     activar_perfil_ollama_local: false
