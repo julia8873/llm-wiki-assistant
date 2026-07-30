@@ -49,9 +49,9 @@ class observer {
             $status = $curl->get_info()['http_code'];
             
             if ($status === 201 || $status === 200) {
-                \core\notification::success('Repositorio oficial de la asignatura (' . $course->shortname . '-Oficial) creado correctamente en GitHub.');
+                \core\notification::success('Repositorio oficial de la asignatura (' . $course->shortname . '-Oficial) creado correctamente en el proveedor Git.');
             } else {
-                \core\notification::error('Error al crear el repositorio oficial en GitHub. Por favor contacte con soporte técnico. (HTTP ' . $status . ')');
+                \core\notification::error('Error al crear el repositorio oficial en el proveedor Git. Por favor contacte con soporte técnico. (HTTP ' . $status . ')');
                 // Registrar en el log de Moodle si falla
                 debugging('Error al aprovisionar la plantilla oficial en mapeo-api. HTTP ' . $status . ': ' . $response, DEBUG_DEVELOPER);
             }

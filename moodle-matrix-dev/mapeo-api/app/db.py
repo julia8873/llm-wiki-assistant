@@ -31,7 +31,8 @@ class MapeoDB(Base):
     id = Column(Integer, primary_key=True, index=True)
     moodle_user_id = Column(Integer, nullable=False)
     moodle_course_id = Column(Integer, nullable=False)
-    github_repo_url = Column(String, nullable=True)
+    repo_url = Column(String, nullable=True)
+    git_provider = Column(String, nullable=False, default="github")
     matrix_room_id = Column(String, nullable=True)
     estado = Column(String, default="PENDIENTE_GITHUB")
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -40,7 +41,7 @@ class MapeoDB(Base):
 def create_db_and_tables():
     if "sqlite:////data" in DATABASE_URL:
         os.makedirs("/data", exist_ok=True)
-    Base.metadata.create_all(bind=engine)
+    # Base.metadata.create_all(bind=engine)  # Removed in favor of Alembic
 
 def get_session():
     db = SessionLocal()

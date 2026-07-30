@@ -7,6 +7,8 @@ El sistema aísla la información de cada alumno para evitar contaminación cruz
 - **Configuración centralizada**: El PAT de GitHub vive en `config/config.yaml` y se propaga automáticamente a `GITHUB_PAT` en el entorno Docker mediante `instalar.sh`, evitando duplicidades con `.env.example`.
 - **Lectura Restringida**: Maubot opera bajo credenciales limitadas exclusivamente al fork vinculado a la sala de ejecución, impidiendo el acceso a repositorios de otros estudiantes.
 
+Para ver los detalles arquitectónicos sobre el desacoplamiento del proveedor Git y la estrategia de base de datos, revisa las \subpage decisiones_tecnicas "Decisiones Técnicas".
+
 ## Mapa de Servicios (Puertos)
 Definidos centralmente en `config/config.yaml`.
 

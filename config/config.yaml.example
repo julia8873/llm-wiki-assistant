@@ -48,13 +48,26 @@ servicios:
     puerto_contenedor: 11434
     url_base: "http://localhost:11434"
 
-github:
-  organizacion: "julia8873"
+git:
+  proveedor_activo: "github"
+  organizacion: "nombre_organizacion_github"
   repo_plantilla: "BdC-template"
-  url_plantilla: "https://github.com/julia8873/BdC-template"
+  url_plantilla: "https://github.com/nombre_organizacion_github/BdC-template"
   rama_defecto: "main"
-  api_base_url: "https://api.github.com"
-  pat: "ghp_CHANGE_ME"
+
+  github:
+    api_base_url: "https://api.github.com"
+    pat: "pon_aqui_tu_token_de_github"
+    pat_env_var: "GITHUB_PAT"
+
+  gitlab:
+    api_base_url: "https://gitlab.com/api/v4"
+    token_env_var: "GITLAB_TOKEN"
+    grupo_destino: "nombre_grupo_gitlab"
+
+  self_hosted:
+    api_base_url: "https://git.midominio.com/api/v4"
+    token_env_var: "GIT_SELF_HOSTED_TOKEN"
 
 llm:
   proveedor_activo: "openai"
@@ -114,7 +127,8 @@ mapeo_bdc:
     id: "id"
     usuario_moodle: "userid"
     asignatura_moodle: "courseid"
-    github_fork_url: "github_fork_url"
+    repo_url: "repo_url"
+    git_provider: "git_provider"
     github_branch: "github_branch"
     matrix_room_id: "matrix_room_id"
     matrix_room_alias: "matrix_room_alias"

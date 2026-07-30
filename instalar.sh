@@ -210,6 +210,9 @@ generate_env() {
   fi
   
   mv "${env_file}.tmp" "$env_file"
+  
+  # Eliminar retornos de carro (CRLF -> LF) para evitar errores "command not found" al hacer source en WSL
+  sed -i 's/\r$//' "$env_file"
 }
 
 ## @fn print_summary()
@@ -264,9 +267,9 @@ cmd_up() {
   
   if [ "$use_ollama" = true ]; then
     info "Perfil Ollama activado."
-    docker compose --env-file .env --profile ollama up -d
+    docker compose --env-file .env --profile ollama up -d --build
   else
-    docker compose --env-file .env up -d
+    docker compose --env-file .env up -d --build
   fi
   
   info "Esperando a que Moodle y mapeo-api estén operativos (Healthchecks)..."

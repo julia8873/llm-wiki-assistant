@@ -38,7 +38,7 @@ def test_create_and_read_mapeo(client: TestClient):
     response = client.post("/mapeos", json={
         "moodle_user_id": 10,
         "moodle_course_id": 5,
-        "github_repo_url": "https://github.com/user/fork1",
+        "repo_url": "https://github.com/user/fork1",
         "matrix_room_id": "!room1:matrix.org"
     }, headers=headers)
     assert response.status_code == 201
@@ -59,14 +59,14 @@ def test_same_user_different_courses(client: TestClient):
     client.post("/mapeos", json={
         "moodle_user_id": 15,
         "moodle_course_id": 1,
-        "github_fork_url": "url1",
+        "repo_url": "url1",
         "matrix_room_id": "room1"
     }, headers=headers)
     
     response = client.post("/mapeos", json={
         "moodle_user_id": 15,
         "moodle_course_id": 2,
-        "github_fork_url": "url2",
+        "repo_url": "url2",
         "matrix_room_id": "room2"
     }, headers=headers)
     assert response.status_code == 201
@@ -74,7 +74,7 @@ def test_same_user_different_courses(client: TestClient):
     response = client.post("/mapeos", json={
         "moodle_user_id": 15,
         "moodle_course_id": 2,
-        "github_fork_url": "url3",
+        "repo_url": "url3",
         "matrix_room_id": "room3"
     }, headers=headers)
     assert response.status_code == 409

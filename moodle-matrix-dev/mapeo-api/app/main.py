@@ -14,7 +14,7 @@ from sqlalchemy.exc import IntegrityError
 
 from .models import MapeoCreate, MapeoRead, MapeoEstado, CursoCreate
 from .db import create_db_and_tables, get_session, MapeoDB
-from .services.github_service import provisionar_repositorio_alumno, provisionar_repositorio_oficial, GitHubProvisionError
+from .services.git import get_git_provider, GitProviderConfigError
 
 app = FastAPI(title="Mapeo API", description="API centralizada para la relación Alumno-Curso-Fork-Sala")
 
@@ -47,11 +47,11 @@ def health_check():
 @app.post("/mapeos", response_model=MapeoRead, status_code=status.HTTP_201_CREATED)
 async def create_mapeo(mapeo: MapeoCreate, session: Session = Depends(get_session), token: str = Depends(verify_token)):
     """!
-    @brief Crea un nuevo mapeo y aprovisiona el repositorio en GitHub.
+    @brief Crea un nuevo mapeo y aprovisiona el repositorio en GitHub/GitLab/Gitea.
     @details
     Endpoint llamado por Moodle cuando un alumno accede por primera vez al bloque BdC.
     Se asegura de que no existan mapeos duplicados para el mismo usuario y curso.
-    Invoca asíncronamente a `provisionar_repositorio_alumno` para interactuar con la API de GitHub.
+    Invoca asíncronamente a `generar_repo_alumno` para interactuar con la API del proveedor de Git.
     
     @param mapeo MapeoCreate Datos enviados desde el bloque de Moodle.
     @param session Session Sesión de la base de datos inyectada por FastAPI.
@@ -76,23 +76,30 @@ async def create_mapeo(mapeo: MapeoCreate, session: Session = Depends(get_sessio
             detail="Ya existe un mapeo para este usuario y curso."
         )
 
-    # Si se nos provee nombre de usuario y asignatura, aprovisionamos GitHub
+    # Si se nos provee nombre de usuario y asignatura, aprovisionamos en el Git provider
     if mapeo.moodle_username and mapeo.moodle_course_shortname:
         try:
-            repo_url = await provisionar_repositorio_alumno(
-                asignatura=mapeo.moodle_course_shortname,
-                usuario=mapeo.moodle_username
-            )
+            provider = get_git_provider()
+            nombre_repo = f"{mapeo.moodle_course_shortname}-{mapeo.moodle_username}"
+            repo_oficial_url = f"{mapeo.moodle_course_shortname}-Oficial"
+            repo_url = await provider.generar_repo_alumno(nombre_repo, repo_oficial_url)
+            
             # Actualizamos BD con éxito
-            db_mapeo.github_repo_url = repo_url
+            db_mapeo.repo_url = repo_url
+            
+            from app.services.git import load_config
+            cfg = load_config()
+            provider_name = cfg['git']['proveedor_activo'] if cfg and 'git' in cfg else 'github'
+            db_mapeo.git_provider = provider_name
+            
             db_mapeo.estado = MapeoEstado.ACTIVO
             session.commit()
             session.refresh(db_mapeo)
-        except GitHubProvisionError as e:
+        except Exception as e:
             # Queda guardado como PENDIENTE_GITHUB, pero devolvemos 502 al cliente (Moodle)
             raise HTTPException(
                 status_code=502,
-                detail=f"Fallo al aprovisionar GitHub: {str(e)}"
+                detail=f"Fallo al aprovisionar repositorio Git: {str(e)}"
             )
 
     return db_mapeo
@@ -127,15 +134,21 @@ def get_by_room(matrix_room_id: str, session: Session = Depends(get_session), to
 @app.post("/cursos", status_code=status.HTTP_201_CREATED)
 async def create_curso(curso: CursoCreate, token: str = Depends(verify_token)):
     """!
-    @brief Aprovisiona la plantilla oficial del curso en GitHub.
+    @brief Aprovisiona la plantilla oficial del curso en el proveedor Git.
     @details
     Endpoint llamado por Moodle al crear un curso nuevo.
     """
     try:
-        repo_url = await provisionar_repositorio_oficial(curso.moodle_course_shortname)
-        return {"status": "ok", "github_repo_url": repo_url}
-    except GitHubProvisionError as e:
+        provider = get_git_provider()
+        # Usamos BdC-template como identificador del template oficial
+        repo_url = await provider.crear_repo_oficial(curso.moodle_course_shortname, template_id="BdC-template")
+        # Marcamos como template para que los alumnos lo puedan copiar limpiamente
+        await provider.marcar_como_template(repo_url)
+        return {"status": "ok", "repo_url": repo_url}
+    except Exception as e:
+        import logging
+        logging.error("Exception in create_curso", exc_info=True)
         raise HTTPException(
             status_code=502,
-            detail=f"Fallo al aprovisionar plantilla oficial en GitHub: {str(e)}"
+            detail=f"Fallo al aprovisionar plantilla oficial en el proveedor Git: {str(e)}"
         )

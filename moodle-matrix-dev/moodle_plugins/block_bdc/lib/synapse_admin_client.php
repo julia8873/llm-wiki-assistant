@@ -44,6 +44,8 @@ class block_bdc_synapse_admin_client {
      *
      * @param string $room_alias Alias deseado (opcional).
      * @param string $invite_user_id ID de Matrix del usuario a invitar.
+     * @param string $room_name Nombre de la sala a crear (por defecto 'Sala de Asistente IA').
+     * @param string $topic Tema o descripción de la sala (por defecto 'Chat 1:1 con tu asistente LLM').
      * @return string ID de la sala de Matrix creada (ej. !xyz:localhost).
      * @throws moodle_exception
      */

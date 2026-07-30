@@ -16,7 +16,9 @@ services:
       retries: 5
 
   moodle:
-    image: bitnamilegacy/moodle:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.moodle
     container_name: ${MOODLE_NOMBRE_CONTENEDOR}
     ports:
       - "${MOODLE_PUERTO_HOST}:${MOODLE_PUERTO_CONTENEDOR}"
@@ -40,7 +42,7 @@ services:
     volumes:
       - moodle_data:/bitnami/moodle
       - moodledata_data:/bitnami/moodledata
-      - ./moodle_plugins/block_bdc:/bitnami/moodle/blocks/bdc
+      - ./moodle_plugins/block_bdc:/moodle-custom-plugin
     healthcheck:
       test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/8080'"]
       interval: 15s
