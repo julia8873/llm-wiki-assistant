@@ -12,6 +12,7 @@ Flujo de ejecución:
 1. Verifica dependencias (Docker).
 2. Clona plantillas de configuración (`.example` -> real).
 3. Levanta el servidor de documentación Doxygen en modo *detached* (segundo plano).
+4. Compila y empaqueta automáticamente el plugin del bot de Matrix en formato `.mbp` (Fase 5).
 
 ### Levantar la Infraestructura (Fase 1)
 Para levantar el stack tecnológico de contenedores, utiliza el comando `up`:
@@ -36,17 +37,18 @@ Luego puedes ejecutar la API o las pruebas con `python` sin depender de `venv`.
 
 ### Configuración del Motor LLM
 El sistema permite cambiar en caliente entre 3 proveedores modificando el campo `llm.proveedor_activo` en `config/config.yaml`:
-1. **`openai`** (por defecto): API externa (gpt-4o-mini).
-2. **`gemini`**: API externa Google (gemini-1.5-flash).
-3. **`ollama`**: Inferencia local.
+1. **`openai`** (por defecto): API externa (gpt-4o-mini). Ideal para producción.
+2. **`gemini`**: API externa Google (gemini-1.5-flash). Ideal para producción.
+3. **`ollama`**: Inferencia local. Soportado vía compatibilidad OpenAI nativa (`/v1/chat/completions`). **Nota importante**: Ollama está pensado para entornos aislados, offline o de prueba. No es el camino principal de producción debido al alto costo de inferencia local en CPU.
 
 *Nota: El token de GitHub se obtiene desde `config/config.yaml` y se inyecta automáticamente como `GITHUB_PAT` en `moodle-matrix-dev/.env` por `instalar.sh`; no es necesario definirlo manualmente en los `.env.example`.*
 
 ### Inferencia Local (Ollama)
-Si seleccionas `ollama` y deseas ejecutar el motor localmente, debes indicarlo explícitamente al levantar la infraestructura (ya que está apagado por defecto para ahorrar recursos):
+Si seleccionas `ollama` y deseas ejecutar el motor localmente mediante Docker, debes indicarlo explícitamente al levantar la infraestructura (ya que está apagado por defecto para ahorrar recursos):
 ```bash
 ./instalar.sh up --ollama
 ```
+El script `instalar.sh` validará que, si se utiliza una instancia de Ollama instalada localmente (fuera de Docker), esta tenga al menos la **versión 0.3.0** instalada, que es la mínima requerida para disponer del endpoint `/v1/chat/completions` usado por el bot.
 
 ### Pruebas manuales en Moodle
 Para validar el flujo completo desde la interfaz, es necesario iniciar sesión en Moodle y ejecutar la acción del bloque BDC desde un curso visible.
@@ -73,3 +75,4 @@ Para validar el flujo completo desde la interfaz, es necesario iniciar sesión e
 | `./instalar.sh down` | Detiene stack conservando volúmenes (Fase 1). |
 | `./instalar.sh git setup` | Configura repositorios base (Fase 1). |
 | `./instalar.sh bot sync` | Fuerza sincronización base de datos Moodle -> Matrix (Fase 3). |
+| `./instalar.sh bot package` | Compila y empaqueta el plugin del bot en formato `.mbp` (Fase 5). |

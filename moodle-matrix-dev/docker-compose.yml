@@ -97,15 +97,40 @@ services:
       retries: 5
 
   maubot:
-    image: dock.mau.dev/maubot/maubot:latest
+    build:
+      context: ./maubot
+      dockerfile: Dockerfile
     container_name: ${MAUBOT_NOMBRE_CONTENEDOR}
+    environment:
+      - MAPEO_API_TOKEN=${MAPEO_API_TOKEN}
+      - GITHUB_PAT=${GITHUB_PAT}
     ports:
       - "${MAUBOT_PUERTO_HOST}:${MAUBOT_PUERTO_CONTENEDOR}"
     volumes:
       - ./maubot:/data
+      - ../config:/config:ro
     depends_on:
       synapse:
         condition: service_healthy
+      pgvector:
+        condition: service_healthy
+
+  pgvector:
+    image: pgvector/pgvector:pg16
+    container_name: moodle-matrix-dev-pgvector-1
+    environment:
+      POSTGRES_USER: llm_wiki
+      POSTGRES_PASSWORD: llm_wiki_pass
+      POSTGRES_DB: vector_store
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgvector_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U llm_wiki -d vector_store"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   ollama:
     image: ollama/ollama:latest
@@ -123,3 +148,4 @@ volumes:
   moodledata_data:
   ollama_data:
   mapeo_api_data:
+  pgvector_data:

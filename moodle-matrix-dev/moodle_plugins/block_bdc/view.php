@@ -29,6 +29,11 @@ $mapeo = $mapeo_client->get_mapeo($userid, $courseid);
 
 if ($mapeo && !empty($mapeo['matrix_room_id'])) {
     // Ya existe la sala, redirigir a Element
+    // Antes de redirigir, nos aseguramos de que el usuario siga invitado por si se salió de la sala
+    $synapse_client = new block_bdc_synapse_admin_client();
+    $matrix_user_id = '@' . $USER->username . ':localhost';
+    $synapse_client->invite_user_to_room($mapeo['matrix_room_id'], $matrix_user_id);
+    
     $element_url = getenv('ELEMENT_URL_BASE') ?: 'http://localhost:8081';
     $redirect_url = $element_url . '/#/room/' . urlencode($mapeo['matrix_room_id']);
     redirect($redirect_url);
@@ -45,6 +50,12 @@ if ($lock) {
         $mapeo = $mapeo_client->get_mapeo($userid, $courseid);
         if ($mapeo && !empty($mapeo['matrix_room_id'])) {
             $lock->release();
+            
+            // Reinvitamos por si se salió
+            $synapse_client = new block_bdc_synapse_admin_client();
+            $matrix_user_id = '@' . $USER->username . ':localhost';
+            $synapse_client->invite_user_to_room($mapeo['matrix_room_id'], $matrix_user_id);
+            
             $element_url = getenv('ELEMENT_URL_BASE') ?: 'http://localhost:8081';
             redirect($element_url . '/#/room/' . urlencode($mapeo['matrix_room_id']));
         }

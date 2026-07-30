@@ -32,6 +32,8 @@ sequenceDiagram
     
     alt Existe mapeo
         MapeoAPI-->>Moodle: matrix_room_id
+        Note over Moodle, Synapse: Capa de Resiliencia (Re-invitación)
+        Moodle->>Synapse: POST /.../invite (Asegurar que el alumno sigue dentro)
         Moodle-->>Alumno: 302 Redirect a Element Web
     else No existe mapeo
         Moodle->>Lock: Adquirir candado 'crear_sala_U_C'
@@ -41,7 +43,7 @@ sequenceDiagram
         Moodle->>MapeoAPI: Doble Check GET /mapeos
         MapeoAPI-->>Moodle: No existe
         
-        Moodle->>Synapse: POST /_matrix/client/v3/createRoom
+        Moodle->>Synapse: POST /_matrix/client/v3/createRoom (Invita: Alumno + Bot)
         Synapse-->>Moodle: 200 OK (matrix_room_id)
         
         Moodle->>MapeoAPI: POST /mapeos
@@ -58,3 +60,7 @@ sequenceDiagram
         Moodle-->>Alumno: 302 Redirect a Element Web
     end
 ```
+
+### Tolerancia a Fallos en Salas Matrix
+1. **Auto-Join del Asistente**: En el instante de la creación de la sala, Moodle incluye explícitamente al bot (`@llm_wiki_bot:localhost`) en el vector `invite` de Synapse. El bot, configurado con "Autojoin", se une a la sala inmediatamente, sin intervención manual.
+2. **Re-invitaciones Resilientes**: Si un alumno abandona manualmente su sala en Matrix (haciendo que pierda los permisos de acceso al ser una sala privada), volver a hacer clic en el bloque de Moodle disparará un endpoint de invitación contra Synapse antes de la redirección. Esto garantiza que el alumno nunca pierda el acceso definitivo a su chat.

@@ -53,13 +53,14 @@ class block_bdc_synapse_admin_client {
         $curl = new \curl(['ignoresecurity' => true]);
         $curl->setHeader('Authorization: Bearer ' . $this->token);
         $curl->setHeader('Content-Type: application/json');
+        $bot_user = getenv('MATRIX_BOT_USER') ?: '@llm_wiki_bot:localhost';
         
         $payload = [
             'visibility' => 'private',
             'room_alias_name' => $room_alias,
             'name' => $room_name,
             'topic' => $topic,
-            'invite' => [$invite_user_id]
+            'invite' => [$invite_user_id, $bot_user]
         ];
         
         // Usamos el CS API estándar para crear la sala, ya que permite invitar.
@@ -108,6 +109,37 @@ class block_bdc_synapse_admin_client {
             return true;
         }
 
+        return false;
+    }
+
+    /**
+     * Invita a un usuario a una sala existente, útil si se salió por error.
+     *
+     * @param string $room_id ID de la sala.
+     * @param string $user_id ID de Matrix del usuario.
+     * @return bool
+     */
+    public function invite_user_to_room($room_id, $user_id) {
+        $curl = new \curl(['ignoresecurity' => true]);
+        $curl->setHeader('Authorization: Bearer ' . $this->token);
+        $curl->setHeader('Content-Type: application/json');
+        
+        $payload = [
+            'user_id' => $user_id
+        ];
+        
+        $url = $this->baseurl . '/_matrix/client/v3/rooms/' . urlencode($room_id) . '/invite';
+        $response = $curl->post($url, json_encode($payload));
+        $status = $curl->get_info()['http_code'];
+        
+        // 200 = Éxito. 
+        // 403 = Muchas veces indica que el usuario ya está en la sala o el que invita no tiene poder. 
+        // Como Moodle es admin, 403 suele ser que el usuario ya está dentro.
+        if ($status === 200 || $status === 403) {
+            return true;
+        }
+        
+        error_log("Fallo al invitar $user_id a $room_id. Status: $status. Resp: $response");
         return false;
     }
 }

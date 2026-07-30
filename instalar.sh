@@ -95,6 +95,9 @@ Fase 1 (Entorno Docker):
 
 Fase 3 (Sincronización):
   bot sync                 Fuerza actualización Moodle -> Matrix.
+
+Fase 5 (Bot LLM):
+  bot package              Empaqueta el plugin de Maubot (.mbp).
 EOF
   exit 0
 }
@@ -125,6 +128,11 @@ cmd_install_all() {
 
   echo "--- Fase: Servidor de Documentación (Doxygen) ---"
   check_docker
+  
+  echo ""
+  echo "--- Fase: Empaquetado del Bot LLM (Fase 5) ---"
+  cmd_bot package
+
   echo "=== Secuencia Completada ==="
   echo "  [OK] Entorno configurado"
   echo "  [OK] Lanzando servidor Doxygen silencioso"
@@ -339,8 +347,33 @@ cmd_git() {
     
   ok "Repositorio maestro configurado con éxito en GitHub."
 }
-cmd_bot()    { error "Comando 'bot sync' pendiente (Fase 3)."; }
-
+## @fn cmd_bot()
+## @brief Comandos de gestión del bot y sincronización
+cmd_bot() {
+  local submode="${1:-}"
+  
+  case "$submode" in
+    package)
+      local plugin_path="${ROOT_DIR}/moodle-matrix-dev/maubot/llm-wiki-assistant-plugin/plugin.mbp"
+      if [[ -f "$plugin_path" ]]; then
+        info "El plugin de Maubot ya está empaquetado (plugin.mbp existe). Omitiendo..."
+      else
+        info "Empaquetando el plugin de Maubot (Fase 5)..."
+        check_docker
+        docker run --rm -v "${ROOT_DIR}/moodle-matrix-dev/maubot/llm-wiki-assistant-plugin:/plugin" alpine sh -c "apk add --no-cache zip && cd /plugin && zip -r plugin.mbp . -x '*/__pycache__/*' -x '*.pyc'"
+        mkdir -p "${ROOT_DIR}/moodle-matrix-dev/maubot/plugins/"
+        cp "${ROOT_DIR}/moodle-matrix-dev/maubot/llm-wiki-assistant-plugin/plugin.mbp" "${ROOT_DIR}/moodle-matrix-dev/maubot/plugins/"
+        ok "Plugin empaquetado y copiado a moodle-matrix-dev/maubot/plugins/plugin.mbp"
+      fi
+      ;;
+    sync)
+      error "Comando 'bot sync' pendiente (Fase 3)."
+      ;;
+    *)
+      error "Subcomando bot no reconocido. Usa 'bot package'."
+      ;;
+  esac
+}
 ## @fn main()
 ## @brief Procesador de línea de comandos. Enruta argumentos a subfunciones.
 ## @param $@ Argumentos pasados al script.

@@ -1,0 +1,13 @@
+id: com.llm_wiki.assistant
+version: 1.0.0
+license: AGPL-3.0-or-later
+modules:
+  - mixins
+  - assistant
+main_class: LLMWikiAssistantPlugin
+database: false
+dependencies:
+  - httpx
+  - asyncpg
+  - pgvector
+  - pyyaml
