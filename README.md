@@ -13,6 +13,18 @@ Sistema integrado de docencia Moodle-Matrix-GitHub. Proporciona a cada estudiant
 > [!WARNING]
 > **Aviso de Seguridad en Producción (Element Web)**: Durante la fase de desarrollo e integración, se han desactivado los avisos de cifrado de extremo a extremo (E2EE) y de copias de seguridad de claves (`UIFeature.keyBackup` y `UIFeature.crossSigning`) en `moodle-matrix-dev/element-config.json` para facilitar las pruebas del bot LLM sin fricción. Antes de desplegar el entorno en producción para la Universidad, se debe evaluar si se requiere E2EE estricto y, en tal caso, volver a activar estas variables.
 
+## Funcionalidades del Bot en Matrix (OKF v0.1)
+El Bot LLM implementa una ingesta automatizada siguiendo el estándar OKF v0.1 (`AGENTS.md`). Cuando se le envía un archivo, el bot genera una abstracción completa en el repositorio, creando:
+- **Concepts**: Conceptos abstractos extraídos.
+- **Entities**: Herramientas o personas mencionadas.
+- **Sources**: Resumen general del documento.
+
+**Comandos del chat disponibles para el alumno:**
+- **`!ayuda`** o **`!comandos`**: Despliega un menú informativo con los comandos.
+- **`!deshacer`** o **`!revertir`**: Revierte la última ingesta automática en GitHub de manera segura (elimina los ficheros extraídos, actualiza la bitácora y borra el contenido de la base vectorial RAG del bot).
+
+## Comandos Operativos Base (Desarrollo)
+
 Único punto de entrada: `instalar.sh`.
 
 ```bash

@@ -9,7 +9,14 @@ class LLMClient:
     def __init__(self, config: Dict[str, Any]):
         self.config = config
 
-    async def get_response(self, system_prompt: str, user_prompt: str) -> str:
+    async def get_response(self, system_prompt: str, user_prompt: str, max_tokens_override: int = None) -> str:
+        """! 
+        @brief Obtiene una respuesta de texto del LLM.
+        @param system_prompt Instrucciones de sistema.
+        @param user_prompt Mensaje del usuario.
+        @param max_tokens_override (Opcional) Sobrescribe el limite maximo de tokens para esta peticion especifica.
+        @return Respuesta generada.
+        """
         raise NotImplementedError("Subclasses must implement get_response")
         
     async def get_embedding(self, text: str) -> list[float]:
@@ -33,7 +40,7 @@ class OpenAICompatibleClient(LLMClient):
         if not self.api_base_url:
             raise LLMClientError(f"api_base_url no configurada para el cliente OpenAI compatible")
 
-    async def get_response(self, system_prompt: str, user_prompt: str) -> str:
+    async def get_response(self, system_prompt: str, user_prompt: str, max_tokens_override: int = None) -> str:
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self.api_key}"
@@ -45,7 +52,7 @@ class OpenAICompatibleClient(LLMClient):
                 {"role": "user", "content": user_prompt}
             ],
             "temperature": self.temperatura,
-            "max_tokens": self.max_tokens,
+            "max_tokens": max_tokens_override if max_tokens_override else self.max_tokens,
             "top_p": self.top_p
         }
 
@@ -106,7 +113,7 @@ class GeminiClient(LLMClient):
         if not self.api_key:
             raise LLMClientError(f"API key requerida en la variable {self.api_key_env_var}")
             
-    async def get_response(self, system_prompt: str, user_prompt: str) -> str:
+    async def get_response(self, system_prompt: str, user_prompt: str, max_tokens_override: int = None) -> str:
         url = f"{self.api_base_url}/models/{self.modelo}:generateContent?key={self.api_key}"
         headers = {"Content-Type": "application/json"}
         payload = {
@@ -118,7 +125,7 @@ class GeminiClient(LLMClient):
             }],
             "generationConfig": {
                 "temperature": self.temperatura,
-                "maxOutputTokens": self.max_tokens,
+                "maxOutputTokens": max_tokens_override if max_tokens_override else self.max_tokens,
                 "topP": self.top_p
             }
         }
@@ -133,6 +140,45 @@ class GeminiClient(LLMClient):
                 raise LLMClientError(f"Error HTTP de Gemini: {e.response.status_code} - {e.response.text}")
             except Exception as e:
                 raise LLMClientError(f"Error de conexión con Gemini: {str(e)}")
+
+    async def get_response_with_file(self, system_prompt: str, user_prompt: str, file_bytes: bytes, mime_type: str = "application/pdf") -> str:
+        import base64
+        b64_data = base64.b64encode(file_bytes).decode('utf-8')
+        
+        url = f"{self.api_base_url}/models/{self.modelo}:generateContent?key={self.api_key}"
+        headers = {"Content-Type": "application/json"}
+        payload = {
+            "systemInstruction": {
+                "parts": [{"text": system_prompt}]
+            },
+            "contents": [{
+                "parts": [
+                    {"text": user_prompt},
+                    {
+                        "inlineData": {
+                            "mimeType": mime_type,
+                            "data": b64_data
+                        }
+                    }
+                ]
+            }],
+            "generationConfig": {
+                "temperature": self.temperatura,
+                "maxOutputTokens": 8192,
+                "topP": self.top_p
+            }
+        }
+
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            try:
+                response = await client.post(url, json=payload, headers=headers)
+                response.raise_for_status()
+                data = response.json()
+                return data["candidates"][0]["content"]["parts"][0]["text"]
+            except httpx.HTTPStatusError as e:
+                raise LLMClientError(f"Error HTTP de Gemini OCR: {e.response.status_code} - {e.response.text}")
+            except Exception as e:
+                raise LLMClientError(f"Error de conexion con Gemini OCR: {str(e)}")
 
     async def get_embedding(self, text: str) -> list[float]:
         url = f"{self.api_base_url}/models/gemini-embedding-2:embedContent?key={self.api_key}"
