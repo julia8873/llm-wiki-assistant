@@ -142,6 +142,39 @@ services:
     volumes:
       - ollama_data:/root/.ollama
 
+  redis:
+    image: redis:7
+    container_name: moodle-matrix-dev-redis-1
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  sync-worker:
+    build:
+      context: ./maubot
+      dockerfile: Dockerfile
+    container_name: moodle-matrix-dev-sync-worker-1
+    # Nos situamos en el directorio del plugin para que RQ pueda importar los módulos
+    working_dir: /data/plugins/llm-wiki-assistant-plugin
+    command: ["rq", "worker", "sync-jobs", "--url", "redis://redis:6379"]
+    environment:
+      - MAPEO_API_TOKEN=${MAPEO_API_TOKEN}
+      - GITHUB_PAT=${GITHUB_PAT}
+      - PYTHONPATH=/data/plugins/llm-wiki-assistant-plugin
+    volumes:
+      - ./maubot:/data
+      - ../config:/config:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+
 volumes:
   mariadb_data:
   moodle_data:
@@ -149,3 +182,4 @@ volumes:
   ollama_data:
   mapeo_api_data:
   pgvector_data:
+  redis_data:

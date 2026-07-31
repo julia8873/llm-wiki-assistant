@@ -1,8 +1,10 @@
 id: com.llm_wiki.assistant
-version: 1.0.0
+version: 1.0.7
 license: AGPL-3.0-or-later
 modules:
   - mixins
+  - git_utils
+  - sync_worker
   - assistant
 main_class: LLMWikiAssistantPlugin
 database: false

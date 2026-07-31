@@ -25,6 +25,7 @@ class MapeoBase(BaseModel):
     moodle_user_id: int
     moodle_course_id: int
     repo_url: Optional[str] = None
+    official_repo_url: Optional[str] = None
     git_provider: Optional[str] = "github"
     matrix_room_id: Optional[str] = None
     estado: MapeoEstado = MapeoEstado.PENDIENTE_GITHUB

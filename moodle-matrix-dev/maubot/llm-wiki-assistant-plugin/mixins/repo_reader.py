@@ -36,62 +36,6 @@ class RepoReader:
             return ""
         return token
 
-    def _inject_token(self, url: str, git_provider: str) -> str:
-        token = self._get_token_for_provider(git_provider)
-        if not token:
-            return url
-            
-        parsed = urllib.parse.urlparse(url)
-        # Para GitHub, el auth suele ser token@... o x-access-token:token@...
-        # Para GitLab suele ser oauth2:token@... o simplemente un nombre:token
-        # Para simplificar y hacerlo agnóstico en HTTPS git moderno, suele valer username:token o solo token
-        if git_provider == "github":
-            auth = f"{token}@"
-        elif git_provider == "gitlab":
-            auth = f"oauth2:{token}@"
-        else:
-            auth = f"llm_bot:{token}@"
-            
-        netloc = auth + parsed.netloc
-        return urllib.parse.urlunparse((parsed.scheme, netloc, parsed.path, parsed.params, parsed.query, parsed.fragment))
-
-    async def clone_or_update(self, repo_url: str, git_provider: str) -> str:
-        """Clona o actualiza el repositorio y devuelve la ruta local."""
-        # Sanitizar nombre de carpeta
-        safe_name = urllib.parse.quote_plus(repo_url)
-        local_path = os.path.join(self.repos_dir, safe_name)
-        
-        auth_url = self._inject_token(repo_url, git_provider)
-        
-        if os.path.exists(os.path.join(local_path, ".git")):
-            # Update
-            logger.debug(f"Actualizando repositorio en {local_path}")
-            proc = await asyncio.create_subprocess_shell(
-                "git pull",
-                cwd=local_path,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-        else:
-            # Clone
-            logger.debug(f"Clonando repositorio en {local_path}")
-            proc = await asyncio.create_subprocess_shell(
-                f"GIT_TERMINAL_PROMPT=0 git clone {auth_url} {local_path}",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            
-        stdout, stderr = await proc.communicate()
-        if proc.returncode != 0:
-            error_msg = stderr.decode()
-            # Ocultar token en los logs
-            token = self._get_token_for_provider(git_provider)
-            if token:
-                error_msg = error_msg.replace(token, "***")
-            raise RepoReaderError(f"Error en Git: {error_msg}")
-            
-        return local_path
-
     def _chunk_text(self, text: str, max_chars: int = 1500, overlap: int = 200) -> List[str]:
         chunks = []
         start = 0
@@ -150,9 +94,12 @@ class RepoReader:
             await self.vector_store.add_chunks(repo_url, chunks_to_insert)
             logger.info(f"Indexados {len(chunks_to_insert)} chunks para {repo_url}")
 
-    async def process_repository(self, repo_url: str, git_provider: str):
+    async def process_repository(self, repo_url: str, official_repo_url: str, git_provider: str):
         """Flujo completo: clona/actualiza e indexa."""
-        local_path = await self.clone_or_update(repo_url, git_provider)
+        from git_utils import asegurar_repo_local
+        safe_name = urllib.parse.quote_plus(repo_url)
+        local_path = os.path.join(self.repos_dir, safe_name)
+        await asegurar_repo_local(repo_url, official_repo_url, local_path)
         await self.index_repository(repo_url, local_path)
 
     async def search(self, repo_url: str, query: str, limit: int = 5) -> List[Dict[str, str]]:
@@ -161,7 +108,7 @@ class RepoReader:
         results = await self.vector_store.search(repo_url, query_embedding, limit)
         return results
 
-    async def ingest_file_okf(self, repo_url: str, git_provider: str, filename: str, file_bytes: bytes, use_ocr: bool = False) -> None:
+    async def ingest_file_okf(self, repo_url: str, official_repo_url: str, git_provider: str, filename: str, file_bytes: bytes, use_ocr: bool = False) -> None:
         """! 
         @brief Ingesta un archivo al repositorio siguiendo el formato OKF v0.1.
         
@@ -170,12 +117,16 @@ class RepoReader:
         y metadatos YAML. Finalmente, hace commit y push de los archivos.
         
         @param repo_url URL del repositorio.
+        @param official_repo_url URL del repositorio oficial.
         @param git_provider Proveedor de Git ('github' o 'gitlab').
         @param filename Nombre del archivo subido.
         @param file_bytes Contenido binario del archivo.
         @param use_ocr Si es True, utiliza el LLM multimodal para OCR en lugar de extraccion de texto normal.
         """
-        local_path = await self.clone_or_update(repo_url, git_provider)
+        from git_utils import asegurar_repo_local
+        safe_name = urllib.parse.quote_plus(repo_url)
+        local_path = os.path.join(self.repos_dir, safe_name)
+        await asegurar_repo_local(repo_url, official_repo_url, local_path)
         
         # 1. Guardar el original en raw/
         raw_dir = os.path.join(local_path, "raw")
@@ -206,7 +157,7 @@ class RepoReader:
                 extracted_text = file_bytes.decode('utf-8', errors='ignore')
                 
         # 3. Leer AGENTS.md para inyectarlo como contexto (si existe)
-        agents_md_path = os.path.join(local_path, "AGENTS.md")
+        agents_md_path = os.path.join(local_path, "material-oficial", "AGENTS.md")
         agents_content = ""
         if os.path.exists(agents_md_path):
             with open(agents_md_path, "r", encoding="utf-8") as f:
@@ -311,7 +262,7 @@ class RepoReader:
             if "nothing to commit" not in str(e).lower():
                 raise
 
-    async def revert_last_ingest(self, repo_url: str, git_provider: str) -> bool:
+    async def revert_last_ingest(self, repo_url: str, official_repo_url: str, git_provider: str) -> bool:
         """! 
         @brief Revierte la ultima operacion de ingesta OKF en el repositorio.
         
@@ -319,11 +270,15 @@ class RepoReader:
         ejecuta un `git revert`, documenta los archivos borrados en la bitacora y hace push.
         
         @param repo_url URL del repositorio.
+        @param official_repo_url URL del repositorio oficial.
         @param git_provider Proveedor de Git ('github' o 'gitlab').
         @return True si se pudo revertir exitosamente, False si la ultima accion no era una ingesta.
-        @raises RepoReaderError si falla la operacion de git o hay conflictos.
+        @throws RepoReaderError si falla la operacion de git o hay conflictos.
         """
-        local_path = await self.clone_or_update(repo_url, git_provider)
+        from git_utils import asegurar_repo_local
+        safe_name = urllib.parse.quote_plus(repo_url)
+        local_path = os.path.join(self.repos_dir, safe_name)
+        await asegurar_repo_local(repo_url, official_repo_url, local_path)
         
         # Comprobar el ultimo commit
         try:

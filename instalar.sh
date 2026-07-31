@@ -362,7 +362,9 @@ cmd_bot() {
         check_docker
         docker run --rm -v "${ROOT_DIR}/moodle-matrix-dev/maubot/llm-wiki-assistant-plugin:/plugin" alpine sh -c "apk add --no-cache zip && cd /plugin && zip -r plugin.mbp . -x '*/__pycache__/*' -x '*.pyc'"
         mkdir -p "${ROOT_DIR}/moodle-matrix-dev/maubot/plugins/"
+        rm -f "${ROOT_DIR}/moodle-matrix-dev/maubot/plugins/"*.mbp
         cp "${ROOT_DIR}/moodle-matrix-dev/maubot/llm-wiki-assistant-plugin/plugin.mbp" "${ROOT_DIR}/moodle-matrix-dev/maubot/plugins/"
+        rm -f "${ROOT_DIR}/moodle-matrix-dev/maubot/llm-wiki-assistant-plugin/plugin.mbp"
         ok "Plugin empaquetado y copiado a moodle-matrix-dev/maubot/plugins/plugin.mbp"
       fi
       ;;

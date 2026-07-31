@@ -12,7 +12,7 @@ class MapeoClient:
         self.api_url = api_url.rstrip('/')
         self.token = token
 
-    async def get_room_mapping(self, matrix_room_id: str) -> Tuple[str, str]:
+    async def get_room_mapping(self, matrix_room_id: str) -> Tuple[str, str, str]:
         """
         Devuelve (repo_url, git_provider) para una sala Matrix específica.
         Si la sala no está mapeada, levanta MapeoClientError.
@@ -36,12 +36,13 @@ class MapeoClient:
                 data = response.json()
                 
                 repo_url = data.get("repo_url")
+                official_repo_url = data.get("official_repo_url")
                 git_provider = data.get("git_provider")
                 
                 if not repo_url or not git_provider:
                     raise MapeoClientError("La respuesta de Mapeo API está incompleta.")
                     
-                return repo_url, git_provider
+                return repo_url, official_repo_url, git_provider
                 
             except httpx.HTTPStatusError as e:
                 raise MapeoClientError(f"Error HTTP de Mapeo API: {e.response.status_code}")

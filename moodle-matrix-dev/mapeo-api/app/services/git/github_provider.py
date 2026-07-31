@@ -68,9 +68,43 @@ class GitHubProvider(GitProviderClient):
                     repo_url = repo_data.get("clone_url", f"https://github.com/{self.org}/{repo_oficial}.git")
                 
                 await self.marcar_como_template(repo_url)
+                await self.registrar_webhook(repo_url)
                 return repo_url
             else:
                 raise GitHubProvisionError(f"Error al generar {self.org}/{repo_oficial}: HTTP {gen_res.status_code}")
+
+    async def registrar_webhook(self, repo_url: str) -> None:
+        repo_name = repo_url.split('/')[-1].replace('.git', '')
+        
+        target_url = getattr(settings, 'PUBLIC_API_URL', os.getenv('PUBLIC_API_URL'))
+        if not target_url:
+            logger.warning(f"No PUBLIC_API_URL set, skipping webhook registration for {repo_name}")
+            return
+            
+        webhook_url = f"{target_url.rstrip('/')}/sync/oficial-updated"
+        secret = getattr(settings, 'GITHUB_WEBHOOK_SECRET', os.getenv('GITHUB_WEBHOOK_SECRET'))
+        if not secret:
+            logger.warning(f"No GITHUB_WEBHOOK_SECRET set, skipping webhook registration for {repo_name}")
+            return
+
+        async with await self._get_client() as client:
+            res = await client.post(
+                f"/repos/{self.org}/{repo_name}/hooks",
+                json={
+                    "name": "web",
+                    "active": True,
+                    "events": ["push"],
+                    "config": {
+                        "url": webhook_url,
+                        "content_type": "json",
+                        "secret": secret
+                    }
+                }
+            )
+            if res.status_code not in (200, 201):
+                logger.warning(f"Failed to register webhook for {repo_name}: HTTP {res.status_code} {res.text}")
+            else:
+                logger.info(f"Successfully registered webhook for {repo_name} pointing to {webhook_url}")
 
     async def marcar_como_template(self, repo_url: str) -> None:
         repo_name = repo_url.split('/')[-1].replace('.git', '')

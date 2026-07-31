@@ -17,6 +17,11 @@ moodle-matrix-dev/homeserver.db
 moodle-matrix-dev/synapse-data/
 moodle-matrix-dev/maubot/data/
 moodle-matrix-dev/maubot/*.db
+moodle-matrix-dev/maubot/*.db-shm
+moodle-matrix-dev/maubot/*.db-wal
+moodle-matrix-dev/maubot/plugins/
+moodle-matrix-dev/maubot/trash/
+*.mbp
 moodle_data/
 mariadb_data/
 

@@ -11,6 +11,11 @@ from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
+import hmac
+import hashlib
+from fastapi import Request
+import redis
+from rq import Queue, Retry
 
 from .models import MapeoCreate, MapeoRead, MapeoEstado, CursoCreate
 from .db import create_db_and_tables, get_session, MapeoDB
@@ -18,6 +23,9 @@ from .services.git import get_git_provider, GitProviderConfigError
 
 app = FastAPI(title="Mapeo API", description="API centralizada para la relación Alumno-Curso-Fork-Sala")
 
+# RQ Setup
+redis_conn = redis.Redis(host='redis', port=6379)
+sync_queue = Queue('sync-jobs', connection=redis_conn)
 security = HTTPBearer()
 
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
@@ -89,12 +97,30 @@ async def create_mapeo(mapeo: MapeoCreate, session: Session = Depends(get_sessio
             
             from app.services.git import load_config
             cfg = load_config()
+            provider_domain = "github.com"
+            org = cfg['git']['organizacion']
+            db_mapeo.official_repo_url = f"https://{provider_domain}/{org}/{repo_oficial_url}.git"
+            
             provider_name = cfg['git']['proveedor_activo'] if cfg and 'git' in cfg else 'github'
             db_mapeo.git_provider = provider_name
             
             db_mapeo.estado = MapeoEstado.ACTIVO
             session.commit()
             session.refresh(db_mapeo)
+            
+            # Encolar el trabajo inicial de sincronización para inyectar material-oficial/
+            job_payload = {
+                "matrix_room_id": db_mapeo.matrix_room_id,
+                "repo_alumno_url": db_mapeo.repo_url,
+                "official_repo_url": db_mapeo.official_repo_url
+            }
+            sync_queue.enqueue(
+                "sync_worker.tasks.sync_repo_task", 
+                kwargs=job_payload,
+                job_timeout="5m",
+                retry=Retry(max=3, interval=[10, 30, 60])
+            )
+            
         except Exception as e:
             # Queda guardado como PENDIENTE_GITHUB, pero devolvemos 502 al cliente (Moodle)
             raise HTTPException(
@@ -108,6 +134,7 @@ async def create_mapeo(mapeo: MapeoCreate, session: Session = Depends(get_sessio
 def read_mapeos(
     moodle_user_id: Optional[int] = None,
     moodle_course_id: Optional[int] = None,
+    matrix_room_id: Optional[str] = None,
     session: Session = Depends(get_session),
     token: str = Depends(verify_token)
 ):
@@ -116,10 +143,12 @@ def read_mapeos(
         query = query.filter(MapeoDB.moodle_user_id == moodle_user_id)
     if moodle_course_id is not None:
         query = query.filter(MapeoDB.moodle_course_id == moodle_course_id)
+    if matrix_room_id is not None:
+        query = query.filter(MapeoDB.matrix_room_id == matrix_room_id)
     
     results = query.all()
     
-    if moodle_user_id is not None and moodle_course_id is not None and not results:
+    if not results and (moodle_user_id is not None or moodle_course_id is not None or matrix_room_id is not None):
         raise HTTPException(status_code=404, detail="Mapeo no encontrado")
         
     return results
@@ -152,3 +181,63 @@ async def create_curso(curso: CursoCreate, token: str = Depends(verify_token)):
             status_code=502,
             detail=f"Fallo al aprovisionar plantilla oficial en el proveedor Git: {str(e)}"
         )
+
+
+@app.post("/sync/oficial-updated")
+async def sync_webhook(request: Request, session: Session = Depends(get_session)):
+    # 1. Verificar firma HMAC
+    secret = os.getenv("GITHUB_WEBHOOK_SECRET")
+    if not secret:
+        raise HTTPException(status_code=500, detail="Webhook secret not configured")
+
+    signature_header = request.headers.get("x-hub-signature-256")
+    if not signature_header:
+        raise HTTPException(status_code=401, detail="Missing signature")
+
+    payload = await request.body()
+    hash_obj = hmac.new(secret.encode('utf-8'), payload, hashlib.sha256)
+    expected_signature = "sha256=" + hash_obj.hexdigest()
+
+    if not hmac.compare_digest(expected_signature, signature_header):
+        raise HTTPException(status_code=401, detail="Invalid signature")
+
+    # 2. Procesar payload
+    data = await request.json()
+    
+    # Solo procesamos push a la rama por defecto
+    if "repository" not in data or "ref" not in data:
+        return {"status": "ignored", "reason": "Not a push event to repository"}
+
+    default_branch = data["repository"].get("default_branch", "main")
+    if data["ref"] != f"refs/heads/{default_branch}":
+        return {"status": "ignored", "reason": f"Not pushing to default branch {default_branch}"}
+
+    official_repo_url = data["repository"].get("clone_url")
+    if not official_repo_url:
+        raise HTTPException(status_code=400, detail="No clone_url in payload")
+
+    # 3. Buscar todos los alumnos que referencian este repositorio oficial
+    alumnos = session.query(MapeoDB).filter(MapeoDB.official_repo_url == official_repo_url).all()
+
+    if not alumnos:
+        return {"status": "ignored", "reason": "No mapped students found for this official repo"}
+
+    # 4. Encolar los jobs
+    enqueued = 0
+    for alumno in alumnos:
+        if alumno.repo_url and alumno.matrix_room_id:
+            job_payload = {
+                "matrix_room_id": alumno.matrix_room_id,
+                "repo_alumno_url": alumno.repo_url,
+                "official_repo_url": official_repo_url
+            }
+            # The function string is the module path to the task inside sync-worker
+            sync_queue.enqueue(
+                "sync_worker.tasks.sync_repo_task", 
+                kwargs=job_payload,
+                job_timeout="5m",
+                retry=Retry(max=3, interval=[10, 30, 60])
+            )
+            enqueued += 1
+
+    return {"status": "ok", "enqueued_jobs": enqueued}

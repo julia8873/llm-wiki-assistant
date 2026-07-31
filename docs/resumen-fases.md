@@ -160,3 +160,65 @@ Para validar el flujo completo desde la interfaz, se puede crear manualmente un 
 - Correo electrónico: `student1@example.com`
 
 Una vez creado, se matricula en un curso de prueba y se ejecuta la acción del bloque BDC desde esa cuenta para comprobar que se genera el mapeo y el repositorio asociado.
+
+---
+
+## Fase 5: Plugin Maubot (Asistente LLM) e Ingesta OKF v0.1
+Esta fase representa el núcleo de la Inteligencia Artificial del proyecto. Se desarrolló el plugin nativo para Maubot capaz de gestionar conversaciones en salas de Matrix, ingerir documentos y orquestar comandos interactivos aplicando el estándar OKF v0.1.
+
+### Desarrollo e Implementación
+- **Motor Multi-LLM (`llm_clients.py`)**:
+  - Interfaz abstracta para soportar proveedores compatibles con OpenAI y de forma nativa la API de Google Gemini (Multimodal).
+  - Configuración dinámica de parámetros (temperatura, max_tokens) heredados desde `config.yaml`.
+  - Soporte explícito para inferencia multimodal (OCR Visual) mediante la subida de binarios (`inlineData`) para interpretar esquemas o apuntes a mano utilizando `gemini-1.5-flash-latest`.
+- **Pipeline de Ingesta Inteligente (`repo_reader.py`)**:
+  - **Detección de Archivos**: Cuando el alumno envía un fichero por el chat de Matrix (ej. un PDF), el bot entra en modo interactivo, preguntando si desea extracción normal (PyPDF) o extracción visual (OCR Inteligente).
+  - **Estándar OKF v0.1**: El bot clona el repositorio del alumno, lee dinámicamente el documento `AGENTS.md` maestro, e inyecta estas reglas en el _system prompt_ del LLM.
+  - **Anti-Fragilidad en Parseo**: Se abandonó la generación de salida en formato JSON en favor de etiquetas XML puras (`<file path="...">...</file>`). Esto resolvió errores críticos de parseo (Unterminated String) que ocurrían cuando el LLM olvidaba escapar comillas al generar contenido Markdown masivo.
+  - El sistema crea dinámicamente la estructura del repositorio:
+    - `raw/`: Archivo original.
+    - `recursos/`: Resumen fuente del documento (`type: Source`).
+    - `conceptos/`: Ficheros aislados de teoría (`type: Concept`).
+    - `entidades/`: Menciones a personas, herramientas o productos (`type: Entity`).
+  - **Inyección YAML**: Todos los archivos generados incluyen forzosamente su cabecera YAML Frontmatter exigida por el estándar OKF.
+  - **Git Automation**: El bot hace un `git add .`, commit y push directo de los resultados de vuelta al fork de GitHub del estudiante, todo en segundo plano.
+- **Comandos de Chat Interactivos (`assistant.py`)**:
+  - Detección de comandos de usuario mediante intercepción estricta en el `handle_message`.
+  - **`!ayuda` / `!comandos`**: Menú dinámico de asistencia.
+  - **`!deshacer` / `!revertir`**: Comando de alta prioridad para corregir extracciones erróneas. El bot lee el historial de Git; si el último commit fue una ingesta automática, invoca un `git revert HEAD --no-commit`, identifica los ficheros borrados, documenta explícitamente los nombres de dichos ficheros en `bitacora/log.md`, realiza commit de la reversión y finalmente re-indexa la base vectorial (RAG) para borrar de su memoria cualquier rastro de los conceptos.
+- **Auditoría y Documentación**:
+  - Aplicación de docstrings estilo Doxygen (`@brief`, `@param`) a todos los métodos expuestos (`ingest_file_okf`, `revert_last_ingest`, `get_response`, `handle_message`).
+  - Validación superada con `./instalar.sh docs check` garantizando cero advertencias arquitectónicas.
+
+### Pruebas Realizadas
+- **Prueba Multimodal OCR**: Se comprobó que el flujo detecta respuestas `ocr`, deriva el binario hacia Gemini y extrae texto no parseable por PyPDF.
+- **Stress-Test de Longitud (Tokens)**: Se forzó el parámetro `max_tokens_override=8192` asegurando que resúmenes extremadamente grandes no sean truncados por el proveedor.
+- **Prueba de Reversión Ciega (`!deshacer`)**: Se comprobó la integridad del repositorio al hacer `!deshacer`. Git manejó limpiamente el borrado de la carpeta `entidades/` (creada dinámicamente gracias al uso de `git add .`) y la bitácora (`log.md`) reflejó limpiamente los archivos revertidos sin romper el historial del estudiante.
+
+---
+
+## Fase 5.1: Sincronización Ascendente (Upstream Sync)
+Esta sub-fase se implementó para resolver el flujo de actualización bidireccional, permitiendo a los profesores propagar cambios en el material oficial (`material-oficial/` en la plantilla de asignatura) a todos los repositorios generados por los estudiantes, sin colisionar con el trabajo de estos y solucionando las limitaciones de la API *generate from template* de GitHub.
+
+### Desarrollo e Implementación
+- **Cola de Tareas Asíncronas (Redis + RQ)**:
+  - Se introdujo un servicio `redis` y un worker dedicado (`sync-worker`) en `docker-compose.yml` para desacoplar el procesamiento pesado de Git del bloque de ejecución de `mapeo-api` y `maubot`.
+  - El worker utiliza la misma base de código que `maubot` compartiendo volumen, lo que permite la reutilización de lógica (`git_utils.py`).
+- **Endpoint Webhook (`mapeo-api`)**:
+  - Nuevo endpoint `POST /sync/oficial-updated` protegido con HMAC (`X-Hub-Signature-256`) utilizando un secreto configurado globalmente (`GITHUB_WEBHOOK_SECRET`).
+  - Al recibir un evento `push` en la rama principal, busca todos los repositorios de alumnos asociados al repositorio oficial mediante el campo `official_repo_url` (ahora persistido en base de datos) y encola un trabajo en RQ por cada uno.
+- **Motor de Git Centralizado (`git_utils.py`)**:
+  - Lógica para asegurar el clonado, la inyección dinámica de credenciales OAuth (para GitHub HTTPS con PAT) y, críticamente, la asignación del remoto `upstream` apuntando al repositorio del profesor.
+- **Flujo de Sincronización Total (Git Archive)**:
+  - Se sustituyó el *checkout selectivo* por un `git archive upstream/main | tar -x --exclude='logs' -C material-oficial/`. Esto garantiza que la carpeta `material-oficial/` siempre contenga una réplica 100% fiel de toda la estructura del profesor, sin conflictos de historial y excluyendo inteligentemente los logs privados del docente.
+  - Tras extraer los ficheros, el bot adjunta automáticamente una entrada de registro al archivo `logs/log.txt` de la raíz del alumno, realiza un commit (firmando incondicionalmente como `LLM Wiki Assistant`) y un push al `origin` del estudiante.
+- **Integración con Maubot**:
+  - Notificación activa a través de un HTTP POST directamente a la API de Synapse (`/_matrix/client/v3/rooms/{room_id}/send/m.room.message`) informando al estudiante que su material oficial ha sido actualizado automáticamente.
+  - Implementación del comando manual `!sincronizar` / `!sync` en `assistant.py` para forzar la actualización a demanda.
+- **Reorganización Estructural**:
+  - Búsqueda de las reglas del bot reorientada desde `/AGENTS.md` local a `material-oficial/AGENTS.md`.
+
+### Pruebas Realizadas
+- **Idempotencia de Git**: Ejecución repetida de clonado sin borrar la carpeta `/tmp/llm_wiki_repos` para certificar la actualización segura (`fetch`/`reset`).
+- **Validación del Enrutamiento Worker-Redis**: Verificación en logs comprobando el inicio correcto del proceso de RQ Worker con acceso a las variables globales.
+- **Compilación Doxygen**: Se superó el filtro `WARN_AS_ERROR=YES` actualizando los docstrings de los nuevos métodos (`asegurar_repo_local`, `sync_repo_task`).

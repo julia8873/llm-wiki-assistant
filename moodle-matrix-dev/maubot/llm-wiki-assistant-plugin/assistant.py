@@ -120,11 +120,12 @@ class LLMWikiAssistantPlugin(Plugin):
                 file_info = self.pending_files.pop(evt.sender)
                 await evt.respond("Procesando documento... (esto puede tardar un poco mientras la IA extrae los conceptos y se guardan en GitHub).")
                 try:
-                    repo_url, git_provider = await self.mapeo_client.get_room_mapping(room_id)
+                    repo_url, official_repo_url, git_provider = await self.mapeo_client.get_room_mapping(room_id)
                     data = await self.client.download_media(file_info["url"])
                     
                     await self.repo_reader.ingest_file_okf(
                         repo_url=repo_url,
+                        official_repo_url=official_repo_url,
                         git_provider=git_provider,
                         filename=file_info["filename"],
                         file_bytes=data,
@@ -132,7 +133,7 @@ class LLMWikiAssistantPlugin(Plugin):
                     )
                     
                     # Re-indexar el repo ahora que tiene los nuevos conceptos .md
-                    await self.repo_reader.process_repository(repo_url, git_provider)
+                    await self.repo_reader.process_repository(repo_url, official_repo_url, git_provider)
                     
                     await evt.respond(f"¡Listo! El archivo ha sido analizado y sus conceptos han sido extraídos mediante {'OCR Multimodal' if use_ocr else 'Extracción Normal'} y guardados correctamente en tu repositorio. Ya puedes preguntarme sobre ellos.")
                 except Exception as e:
@@ -150,7 +151,8 @@ class LLMWikiAssistantPlugin(Plugin):
             await evt.respond(
                 "### 🛠️ Comandos Disponibles\n\n"
                 "- **`!ayuda`** / **`!comandos`**: Muestra este menú de ayuda.\n"
-                "- **`!deshacer`** / **`!revertir`**: Revierte la última ingesta automática de un documento (elimina sus conceptos y olvida la información).\n\n"
+                "- **`!deshacer`** / **`!revertir`**: Revierte la última ingesta automática de un documento (elimina sus conceptos y olvida la información).\n"
+                "- **`!sincronizar`**: Sincroniza tu repositorio con los últimos materiales oficiales de la asignatura.\n\n"
                 "💡 *Puedes subir archivos al chat y te preguntaré si quieres analizarlos usando IA normal o IA Visual (OCR).* \n"
                 "💡 *Cualquier otro texto que escribas lo tomaré como una pregunta sobre tu base de conocimiento.*"
             )
@@ -159,11 +161,11 @@ class LLMWikiAssistantPlugin(Plugin):
         if lower_q in ["!deshacer", "!revertir"]:
             await evt.respond("Comprobando el historial... intentando revertir la última ingesta de documento.")
             try:
-                repo_url, git_provider = await self.mapeo_client.get_room_mapping(room_id)
-                success = await self.repo_reader.revert_last_ingest(repo_url, git_provider)
+                repo_url, official_repo_url, git_provider = await self.mapeo_client.get_room_mapping(room_id)
+                success = await self.repo_reader.revert_last_ingest(repo_url, official_repo_url, git_provider)
                 if success:
                     # Re-indexar para borrar de la BD vectorial los documentos borrados
-                    await self.repo_reader.process_repository(repo_url, git_provider)
+                    await self.repo_reader.process_repository(repo_url, official_repo_url, git_provider)
                     await evt.respond("✅ ¡Hecho! La última ingesta de documento ha sido revertida en el repositorio. La IA ha olvidado sus conceptos y se ha borrado todo rastro de ella.")
                 else:
                     await evt.respond("❌ No se ha podido revertir. Parece que la última acción en el repositorio no fue una ingesta automática, o ya fue revertida.")
@@ -172,18 +174,34 @@ class LLMWikiAssistantPlugin(Plugin):
                 await evt.respond(f"❌ Ocurrió un error al intentar deshacer: {e}")
             return
             
+        if lower_q in ["!sincronizar", "!sync"]:
+            await evt.respond("Iniciando sincronización manual con los materiales del profesor...")
+            try:
+                repo_url, official_repo_url, git_provider = await self.mapeo_client.get_room_mapping(room_id)
+                # Ejecutamos la tarea de sync directamente (bloqueando) para el comando manual
+                from sync_worker.tasks import _async_sync_repo_task
+                await _async_sync_repo_task(room_id, repo_url, official_repo_url)
+                
+                # Re-indexar el repo
+                await self.repo_reader.process_repository(repo_url, official_repo_url, git_provider)
+                await evt.respond("✅ Sincronización completada. Ya tienes los últimos materiales del profesor.")
+            except Exception as e:
+                self.log.error(f"Error al sincronizar manualmente: {e}")
+                await evt.respond(f"❌ Ocurrió un error durante la sincronización: {e}")
+            return
+            
         self.log.info(f"Mensaje procesado: '{query}' de {evt.sender} en {room_id}")
         
         try:
             # 1. Resolver el repositorio
-            repo_url, git_provider = await self.mapeo_client.get_room_mapping(room_id)
+            repo_url, official_repo_url, git_provider = await self.mapeo_client.get_room_mapping(room_id)
             
             # 2. Clonar/Actualizar e indexar
             await evt.mark_read()
             # Opcional: enviar un "escribiendo..." mientras clona/indexa
             await self.client.set_typing(room_id, timeout=10000)
             
-            await self.repo_reader.process_repository(repo_url, git_provider)
+            await self.repo_reader.process_repository(repo_url, official_repo_url, git_provider)
             
             # 3. Buscar contexto
             results = await self.repo_reader.search(repo_url, query, limit=5)
