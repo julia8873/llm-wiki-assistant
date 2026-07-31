@@ -12,20 +12,17 @@ class MapeoClient:
         self.api_url = api_url.rstrip('/')
         self.token = token
 
-    async def get_room_mapping(self, matrix_room_id: str) -> Tuple[str, str, str]:
+    async def get_room_mapping(self, matrix_room_id: str) -> Dict[str, Any]:
         """
-        Devuelve (repo_url, git_provider) para una sala Matrix específica.
+        Devuelve el diccionario completo del mapeo para una sala Matrix específica.
         Si la sala no está mapeada, levanta MapeoClientError.
         """
         headers = {}
         if self.token:
             headers["Authorization"] = f"Bearer {self.token}"
         
-        
         async with httpx.AsyncClient(timeout=10.0) as client:
             try:
-                # urllib.parse.quote para asegurar que el ! del room id se escape correctamente si hace falta,
-                # pero httpx suele manejarlo.
                 url = f"{self.api_url}/mapeos/by-room/{matrix_room_id}"
                 response = await client.get(url, headers=headers)
                 
@@ -36,13 +33,12 @@ class MapeoClient:
                 data = response.json()
                 
                 repo_url = data.get("repo_url")
-                official_repo_url = data.get("official_repo_url")
                 git_provider = data.get("git_provider")
                 
                 if not repo_url or not git_provider:
                     raise MapeoClientError("La respuesta de Mapeo API está incompleta.")
                     
-                return repo_url, official_repo_url, git_provider
+                return data
                 
             except httpx.HTTPStatusError as e:
                 raise MapeoClientError(f"Error HTTP de Mapeo API: {e.response.status_code}")

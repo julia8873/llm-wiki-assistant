@@ -142,4 +142,27 @@ class block_bdc_synapse_admin_client {
         error_log("Fallo al invitar $user_id a $room_id. Status: $status. Resp: $response");
         return false;
     }
+    /**
+     * Fuerza la unión de un usuario a una sala usando la API de Admin de Synapse.
+     * Previene errores 403 (You are not invited) si Element Web no auto-une al usuario.
+     *
+     * @param string $room_id ID de la sala.
+     * @param string $user_id ID de Matrix del usuario.
+     * @throws moodle_exception
+     */
+    public function join_user_to_room($room_id, $user_id) {
+        $curl = new \curl(['ignoresecurity' => true]);
+        $curl->setHeader('Authorization: Bearer ' . $this->token);
+        $curl->setHeader('Content-Type: application/json');
+
+        $url = $this->baseurl . '/_synapse/admin/v1/join/' . urlencode($room_id);
+        $payload = ['user_id' => $user_id];
+        
+        $response = $curl->post($url, json_encode($payload));
+        $status = $curl->get_info()['http_code'];
+
+        if ($status !== 200) {
+            throw new moodle_exception('error_join_room', 'block_bdc', '', $response);
+        }
+    }
 }

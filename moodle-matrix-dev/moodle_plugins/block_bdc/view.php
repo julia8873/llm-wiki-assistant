@@ -24,15 +24,17 @@ $userid = $USER->id;
 // Cliente de la API de mapeo
 $mapeo_client = new block_bdc_mapeo_client();
 
+$is_teacher = has_capability('moodle/course:update', $context) || has_capability('moodle/course:viewhiddenactivities', $context) || has_capability('moodle/grade:edit', $context);
+
 // 1. Comprobación rápida sin bloqueo
 $mapeo = $mapeo_client->get_mapeo($userid, $courseid);
 
 if ($mapeo && !empty($mapeo['matrix_room_id'])) {
     // Ya existe la sala, redirigir a Element
-    // Antes de redirigir, nos aseguramos de que el usuario siga invitado por si se salió de la sala
+    // Aseguramos que el usuario está dentro de la sala forzando el join
     $synapse_client = new block_bdc_synapse_admin_client();
     $matrix_user_id = '@' . $USER->username . ':localhost';
-    $synapse_client->invite_user_to_room($mapeo['matrix_room_id'], $matrix_user_id);
+    $synapse_client->join_user_to_room($mapeo['matrix_room_id'], $matrix_user_id);
     
     $element_url = getenv('ELEMENT_URL_BASE') ?: 'http://localhost:8081';
     $redirect_url = $element_url . '/#/room/' . urlencode($mapeo['matrix_room_id']);
@@ -51,10 +53,10 @@ if ($lock) {
         if ($mapeo && !empty($mapeo['matrix_room_id'])) {
             $lock->release();
             
-            // Reinvitamos por si se salió
+            // Forzamos el join
             $synapse_client = new block_bdc_synapse_admin_client();
             $matrix_user_id = '@' . $USER->username . ':localhost';
-            $synapse_client->invite_user_to_room($mapeo['matrix_room_id'], $matrix_user_id);
+            $synapse_client->join_user_to_room($mapeo['matrix_room_id'], $matrix_user_id);
             
             $element_url = getenv('ELEMENT_URL_BASE') ?: 'http://localhost:8081';
             redirect($element_url . '/#/room/' . urlencode($mapeo['matrix_room_id']));
@@ -72,16 +74,19 @@ if ($lock) {
         // Fase 4.1: Asegurarnos de que el usuario exista en Matrix antes de invitarlo.
         $synapse_client->ensure_user_exists($USER->username);
         
-        $room_name = $course->fullname;
+        $room_name = $course->fullname . ($is_teacher ? ' (Profesor)' : '');
         $topic = 'Chat 1:1 conectado a tu repositorio de base de conocimiento para la asignatura ' . $course->fullname;
         $room_id = $synapse_client->create_room($alias, $matrix_user_id, $room_name, $topic);
+        
+        // Forzar al usuario a unirse a la sala para evitar 403
+        $synapse_client->join_user_to_room($room_id, $matrix_user_id);
         
         // Ya no enviamos un placeholder, la API de mapeo lo provisiona
         $github_url = '';
         
         // Guardar mapeo en la BD central
         try {
-            $mapeo_client->create_mapeo($userid, $courseid, $github_url, $room_id, $USER->username, $course->shortname);
+            $mapeo_client->create_mapeo($userid, $courseid, $github_url, $room_id, $USER->username, $course->shortname, $is_teacher);
         } catch (\moodle_exception $e) {
             // Fallback (Capa 2 de idempotencia): Si el API devuelve 409 Conflict a pesar del lock
             // significa que la sala se creó, atrapamos el error, recuperamos la info real y avanzamos.

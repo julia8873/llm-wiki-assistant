@@ -5,11 +5,11 @@
 import os
 import asyncio
 import logging
-from typing import Optional
+from typing import Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
-async def run_git_command(*args, cwd: str) -> tuple[int, str, str]:
+async def run_git_command(*args, cwd: str):
     """!
     @brief Ejecuta un comando git de forma asíncrona.
     """

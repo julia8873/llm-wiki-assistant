@@ -70,7 +70,9 @@ async def create_mapeo(mapeo: MapeoCreate, session: Session = Depends(get_sessio
         moodle_user_id=mapeo.moodle_user_id,
         moodle_course_id=mapeo.moodle_course_id,
         matrix_room_id=mapeo.matrix_room_id,
-        estado=MapeoEstado.PENDIENTE_GITHUB
+        estado=MapeoEstado.PENDIENTE_GITHUB,
+        is_teacher=1 if mapeo.is_teacher else 0,
+        moodle_username=mapeo.moodle_username
     )
     
     try:
@@ -90,36 +92,56 @@ async def create_mapeo(mapeo: MapeoCreate, session: Session = Depends(get_sessio
             provider = get_git_provider()
             nombre_repo = f"{mapeo.moodle_course_shortname}-{mapeo.moodle_username}"
             repo_oficial_url = f"{mapeo.moodle_course_shortname}-Oficial"
-            repo_url = await provider.generar_repo_alumno(nombre_repo, repo_oficial_url)
-            
-            # Actualizamos BD con éxito
-            db_mapeo.repo_url = repo_url
             
             from app.services.git import load_config
             cfg = load_config()
             provider_domain = "github.com"
             org = cfg['git']['organizacion']
+            
+            if mapeo.is_teacher:
+                # El profesor usa el repositorio oficial directamente, no creamos un fork
+                repo_url = f"https://{provider_domain}/{org}/{repo_oficial_url}.git"
+            else:
+                repo_url = await provider.generar_repo_alumno(nombre_repo, repo_oficial_url)
+            
+            # Actualizamos BD con éxito
+            db_mapeo.repo_url = repo_url
             db_mapeo.official_repo_url = f"https://{provider_domain}/{org}/{repo_oficial_url}.git"
+            db_mapeo.estado = MapeoEstado.ACTIVO
+            db_mapeo.is_teacher = 1 if mapeo.is_teacher else 0
             
             provider_name = cfg['git']['proveedor_activo'] if cfg and 'git' in cfg else 'github'
             db_mapeo.git_provider = provider_name
             
-            db_mapeo.estado = MapeoEstado.ACTIVO
             session.commit()
             session.refresh(db_mapeo)
             
-            # Encolar el trabajo inicial de sincronización para inyectar material-oficial/
-            job_payload = {
-                "matrix_room_id": db_mapeo.matrix_room_id,
-                "repo_alumno_url": db_mapeo.repo_url,
-                "official_repo_url": db_mapeo.official_repo_url
-            }
-            sync_queue.enqueue(
-                "sync_worker.tasks.sync_repo_task", 
-                kwargs=job_payload,
-                job_timeout="5m",
-                retry=Retry(max=3, interval=[10, 30, 60])
-            )
+            # Encolar el trabajo inicial de sincronización para inyectar material-oficial/ (sólo alumnos)
+            # O crear la carpeta para el profesor (sólo profesores)
+            if not mapeo.is_teacher:
+                job_payload = {
+                    "matrix_room_id": db_mapeo.matrix_room_id,
+                    "repo_alumno_url": db_mapeo.repo_url,
+                    "official_repo_url": db_mapeo.official_repo_url
+                }
+                sync_queue.enqueue(
+                    "sync_worker.tasks.sync_repo_task", 
+                    kwargs=job_payload,
+                    job_timeout="5m",
+                    retry=Retry(max=3, interval=[10, 30, 60])
+                )
+            else:
+                job_payload = {
+                    "matrix_room_id": db_mapeo.matrix_room_id,
+                    "official_repo_url": db_mapeo.official_repo_url,
+                    "moodle_username": mapeo.moodle_username
+                }
+                sync_queue.enqueue(
+                    "sync_worker.tasks.init_teacher_repo_task", 
+                    kwargs=job_payload,
+                    job_timeout="5m",
+                    retry=Retry(max=3, interval=[10, 30, 60])
+                )
             
         except Exception as e:
             # Queda guardado como PENDIENTE_GITHUB, pero devolvemos 502 al cliente (Moodle)
@@ -217,7 +239,10 @@ async def sync_webhook(request: Request, session: Session = Depends(get_session)
         raise HTTPException(status_code=400, detail="No clone_url in payload")
 
     # 3. Buscar todos los alumnos que referencian este repositorio oficial
-    alumnos = session.query(MapeoDB).filter(MapeoDB.official_repo_url == official_repo_url).all()
+    alumnos = session.query(MapeoDB).filter(
+        MapeoDB.official_repo_url == official_repo_url,
+        MapeoDB.is_teacher == 0
+    ).all()
 
     if not alumnos:
         return {"status": "ignored", "reason": "No mapped students found for this official repo"}

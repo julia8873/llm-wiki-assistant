@@ -71,10 +71,11 @@ class block_bdc_mapeo_client {
      * @param string $matrix_room ID de sala en Matrix generado por Synapse Admin API.
      * @param string $username Username del usuario en Moodle para generar el repositorio [asignatura]-[usuario].
      * @param string $course_shortname Nombre corto del curso para usar como base del repositorio template.
+     * @param bool $is_teacher Indica si el usuario es un profesor.
      * @return array Resultado de la API devolviendo el mapeo generado.
      * @throws moodle_exception Si hay un error, como un 409 Conflict.
      */
-    public function create_mapeo($userid, $courseid, $github_url, $matrix_room, $username = "", $course_shortname = "") {
+    public function create_mapeo($userid, $courseid, $github_url, $matrix_room, $username = "", $course_shortname = "", $is_teacher = false) {
         $curl = new \curl(['ignoresecurity' => true]);
         $curl->setHeader('Authorization: Bearer ' . $this->token);
         $curl->setHeader('Content-Type: application/json');
@@ -85,7 +86,8 @@ class block_bdc_mapeo_client {
             'github_repo_url' => $github_url,
             'matrix_room_id' => $matrix_room,
             'moodle_username' => $username,
-            'moodle_course_shortname' => $course_shortname
+            'moodle_course_shortname' => $course_shortname,
+            'is_teacher' => $is_teacher
         ]);
         
         $url = $this->baseurl . '/mapeos';

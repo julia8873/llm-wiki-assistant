@@ -58,9 +58,9 @@ class LLMWikiAssistantPlugin(Plugin):
             self.llm_client = get_llm_client(self.app_config)
             self.repo_reader = RepoReader(self.app_config, self.vector_store, self.llm_client)
         except Exception as e:
-            self.log.error(f"Error inicializando clientes LLM/Repo: {e}")
-
-        self.pending_files = {}
+            self.log.info("LlmWikiAssistantPlugin iniciado y configurado.")
+        self.pending_files = {}  # {user_id: {"url": mxc_url, "filename": name}}
+        self.teacher_mode = {}   # {room_id: "oficial" | "carpeta"}
 
     async def stop(self) -> None:
         if hasattr(self, 'vector_store'):
@@ -120,20 +120,18 @@ class LLMWikiAssistantPlugin(Plugin):
                 file_info = self.pending_files.pop(evt.sender)
                 await evt.respond("Procesando documento... (esto puede tardar un poco mientras la IA extrae los conceptos y se guardan en GitHub).")
                 try:
-                    repo_url, official_repo_url, git_provider = await self.mapeo_client.get_room_mapping(room_id)
+                    mapeo_data = await self.mapeo_client.get_room_mapping(room_id)
                     data = await self.client.download_media(file_info["url"])
                     
                     await self.repo_reader.ingest_file_okf(
-                        repo_url=repo_url,
-                        official_repo_url=official_repo_url,
-                        git_provider=git_provider,
-                        filename=file_info["filename"],
-                        file_bytes=data,
-                        use_ocr=use_ocr
+                        data, 
+                        file_info["filename"], 
+                        mapeo_data,
+                        with_ocr=use_ocr
                     )
                     
                     # Re-indexar el repo ahora que tiene los nuevos conceptos .md
-                    await self.repo_reader.process_repository(repo_url, official_repo_url, git_provider)
+                    await self.repo_reader.process_repository(mapeo_data)
                     
                     await evt.respond(f"¡Listo! El archivo ha sido analizado y sus conceptos han sido extraídos mediante {'OCR Multimodal' if use_ocr else 'Extracción Normal'} y guardados correctamente en tu repositorio. Ya puedes preguntarme sobre ellos.")
                 except Exception as e:
@@ -152,20 +150,56 @@ class LLMWikiAssistantPlugin(Plugin):
                 "### 🛠️ Comandos Disponibles\n\n"
                 "- **`!ayuda`** / **`!comandos`**: Muestra este menú de ayuda.\n"
                 "- **`!deshacer`** / **`!revertir`**: Revierte la última ingesta automática de un documento (elimina sus conceptos y olvida la información).\n"
-                "- **`!sincronizar`**: Sincroniza tu repositorio con los últimos materiales oficiales de la asignatura.\n\n"
+                "- **`!sincronizar`**: Sincroniza tu repositorio con los últimos materiales oficiales de la asignatura.\n"
+                "- **`!repo`**: Muestra el enlace del repositorio GitHub/GitLab que está conectado a esta sala.\n"
+                "- **`!modo oficial` / `!modo carpeta`** *(solo profesores)*: Cambia si la IA busca respuestas en todo el repositorio oficial o solo en tu carpeta personal.\n\n"
                 "💡 *Puedes subir archivos al chat y te preguntaré si quieres analizarlos usando IA normal o IA Visual (OCR).* \n"
                 "💡 *Cualquier otro texto que escribas lo tomaré como una pregunta sobre tu base de conocimiento.*"
             )
             return
             
+        if lower_q == "!repo":
+            try:
+                mapeo_data = await self.mapeo_client.get_room_mapping(room_id)
+                repo_url = mapeo_data.get('repo_url', 'No encontrado')
+                
+                # Transformar la URL para que sea clickeable (eliminar token si existe)
+                import re
+                clean_url = re.sub(r'https://[^@]+@', 'https://', repo_url)
+                if clean_url.endswith('.git'):
+                    clean_url = clean_url[:-4]
+                    
+                await evt.respond(f"🔗 **Repositorio vinculado a esta sala:**\n{clean_url}")
+            except Exception as e:
+                await evt.respond("Esta sala no tiene un repositorio vinculado.")
+            return
+
+        if lower_q in ["!modo oficial", "!modo carpeta"]:
+            try:
+                mapeo_data = await self.mapeo_client.get_room_mapping(room_id)
+                if not mapeo_data.get("is_teacher"):
+                    await evt.respond("Este comando solo está disponible para profesores.")
+                    return
+                if lower_q == "!modo oficial":
+                    self.teacher_mode[room_id] = "oficial"
+                    await evt.respond("Modo cambiado a **oficial**. Ahora responderé basándome en todo el contenido de la asignatura.")
+                else:
+                    self.teacher_mode[room_id] = "carpeta"
+                    await evt.respond("Modo cambiado a **carpeta**. Ahora responderé basándome exclusivamente en el contenido de tu carpeta personal.")
+            except Exception as e:
+                await evt.respond(f"❌ Error al verificar permisos: {e}")
+            return
+            
         if lower_q in ["!deshacer", "!revertir"]:
             await evt.respond("Comprobando el historial... intentando revertir la última ingesta de documento.")
             try:
-                repo_url, official_repo_url, git_provider = await self.mapeo_client.get_room_mapping(room_id)
-                success = await self.repo_reader.revert_last_ingest(repo_url, official_repo_url, git_provider)
+                mapeo_data = await self.mapeo_client.get_room_mapping(room_id)
+                repo_url = mapeo_data.get('repo_url')
+                official_repo_url = mapeo_data.get('official_repo_url')
+                success = await self.repo_reader.revert_last_ingest(mapeo_data)
                 if success:
                     # Re-indexar para borrar de la BD vectorial los documentos borrados
-                    await self.repo_reader.process_repository(repo_url, official_repo_url, git_provider)
+                    await self.repo_reader.process_repository(mapeo_data)
                     await evt.respond("✅ ¡Hecho! La última ingesta de documento ha sido revertida en el repositorio. La IA ha olvidado sus conceptos y se ha borrado todo rastro de ella.")
                 else:
                     await evt.respond("❌ No se ha podido revertir. Parece que la última acción en el repositorio no fue una ingesta automática, o ya fue revertida.")
@@ -177,13 +211,15 @@ class LLMWikiAssistantPlugin(Plugin):
         if lower_q in ["!sincronizar", "!sync"]:
             await evt.respond("Iniciando sincronización manual con los materiales del profesor...")
             try:
-                repo_url, official_repo_url, git_provider = await self.mapeo_client.get_room_mapping(room_id)
+                mapeo_data = await self.mapeo_client.get_room_mapping(room_id)
+                repo_url = mapeo_data.get('repo_url')
+                official_repo_url = mapeo_data.get('official_repo_url')
                 # Ejecutamos la tarea de sync directamente (bloqueando) para el comando manual
                 from sync_worker.tasks import _async_sync_repo_task
                 await _async_sync_repo_task(room_id, repo_url, official_repo_url)
                 
                 # Re-indexar el repo
-                await self.repo_reader.process_repository(repo_url, official_repo_url, git_provider)
+                await self.repo_reader.process_repository(mapeo_data)
                 await evt.respond("✅ Sincronización completada. Ya tienes los últimos materiales del profesor.")
             except Exception as e:
                 self.log.error(f"Error al sincronizar manualmente: {e}")
@@ -194,17 +230,26 @@ class LLMWikiAssistantPlugin(Plugin):
         
         try:
             # 1. Resolver el repositorio
-            repo_url, official_repo_url, git_provider = await self.mapeo_client.get_room_mapping(room_id)
+            mapeo_data = await self.mapeo_client.get_room_mapping(room_id)
+            repo_url = mapeo_data.get('repo_url')
+            official_repo_url = mapeo_data.get('official_repo_url')
+            git_provider = mapeo_data.get('git_provider')
+            
+            # Inyectar teacher_mode en mapeo_data si existe
+            if room_id in self.teacher_mode:
+                mapeo_data['teacher_mode'] = self.teacher_mode[room_id]
+            else:
+                mapeo_data['teacher_mode'] = "oficial"  # Default
             
             # 2. Clonar/Actualizar e indexar
             await evt.mark_read()
             # Opcional: enviar un "escribiendo..." mientras clona/indexa
             await self.client.set_typing(room_id, timeout=10000)
             
-            await self.repo_reader.process_repository(repo_url, official_repo_url, git_provider)
+            await self.repo_reader.process_repository(mapeo_data)
             
             # 3. Buscar contexto
-            results = await self.repo_reader.search(repo_url, query, limit=5)
+            results = await self.repo_reader.search(mapeo_data, query, limit=5)
             
             # 4. Generar respuesta
             system_prompt_with_context = f"{self.system_prompt}\n\n"

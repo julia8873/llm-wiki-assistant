@@ -29,6 +29,8 @@ class MapeoBase(BaseModel):
     git_provider: Optional[str] = "github"
     matrix_room_id: Optional[str] = None
     estado: MapeoEstado = MapeoEstado.PENDIENTE_GITHUB
+    is_teacher: bool = False
+    moodle_username: Optional[str] = None
 
 class MapeoCreate(MapeoBase):
     """!

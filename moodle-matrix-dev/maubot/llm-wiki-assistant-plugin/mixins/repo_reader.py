@@ -94,42 +94,52 @@ class RepoReader:
             await self.vector_store.add_chunks(repo_url, chunks_to_insert)
             logger.info(f"Indexados {len(chunks_to_insert)} chunks para {repo_url}")
 
-    async def process_repository(self, repo_url: str, official_repo_url: str, git_provider: str):
+    async def process_repository(self, mapeo_data: Dict[str, Any]):
         """Flujo completo: clona/actualiza e indexa."""
+        repo_url = mapeo_data.get('repo_url')
+        official_repo_url = mapeo_data.get('official_repo_url')
         from git_utils import asegurar_repo_local
         safe_name = urllib.parse.quote_plus(repo_url)
         local_path = os.path.join(self.repos_dir, safe_name)
         await asegurar_repo_local(repo_url, official_repo_url, local_path)
         await self.index_repository(repo_url, local_path)
 
-    async def search(self, repo_url: str, query: str, limit: int = 5) -> List[Dict[str, str]]:
+    async def search(self, mapeo_data: Dict[str, Any], query: str, limit: int = 5) -> List[Dict[str, str]]:
         """Busca en el repositorio usando RAG."""
+        repo_url = mapeo_data.get('repo_url')
         query_embedding = await self.llm_client.get_embedding(query)
         results = await self.vector_store.search(repo_url, query_embedding, limit)
+        
+        # Filtrar si el profesor está en modo carpeta
+        is_teacher = mapeo_data.get("is_teacher", False)
+        teacher_mode = mapeo_data.get("teacher_mode", "oficial")
+        moodle_username = mapeo_data.get("moodle_username", "unknown")
+        
+        if is_teacher and teacher_mode == "carpeta":
+            prefix = f"profesores/{moodle_username}/"
+            results = [r for r in results if r["file_path"].startswith(prefix)]
+            
         return results
 
-    async def ingest_file_okf(self, repo_url: str, official_repo_url: str, git_provider: str, filename: str, file_bytes: bytes, use_ocr: bool = False) -> None:
+    async def ingest_file_okf(self, file_bytes: bytes, filename: str, mapeo_data: Dict[str, Any], with_ocr: bool = False) -> None:
         """! 
         @brief Ingesta un archivo al repositorio siguiendo el formato OKF v0.1.
-        
-        Guarda el documento original en 'raw/', extrae el texto (mediante PyPDF o LLM OCR),
-        y utiliza el LLM para estructurar los conceptos, entidades y fuentes con formato XML
-        y metadatos YAML. Finalmente, hace commit y push de los archivos.
-        
-        @param repo_url URL del repositorio.
-        @param official_repo_url URL del repositorio oficial.
-        @param git_provider Proveedor de Git ('github' o 'gitlab').
-        @param filename Nombre del archivo subido.
-        @param file_bytes Contenido binario del archivo.
-        @param use_ocr Si es True, utiliza el LLM multimodal para OCR en lugar de extraccion de texto normal.
         """
+        repo_url = mapeo_data.get('repo_url')
+        official_repo_url = mapeo_data.get('official_repo_url')
+        git_provider = mapeo_data.get('git_provider')
+        is_teacher = mapeo_data.get("is_teacher", False)
+        moodle_username = mapeo_data.get("moodle_username", "unknown")
+        
+        base_dir = f"profesores/{moodle_username}" if is_teacher else "."
+        
         from git_utils import asegurar_repo_local
         safe_name = urllib.parse.quote_plus(repo_url)
         local_path = os.path.join(self.repos_dir, safe_name)
         await asegurar_repo_local(repo_url, official_repo_url, local_path)
         
         # 1. Guardar el original en raw/
-        raw_dir = os.path.join(local_path, "raw")
+        raw_dir = os.path.join(local_path, base_dir, "raw")
         os.makedirs(raw_dir, exist_ok=True)
         file_path = os.path.join(raw_dir, filename)
         with open(file_path, "wb") as f:
@@ -138,7 +148,7 @@ class RepoReader:
         # 2. Extraer texto (Normal o OCR)
         extracted_text = ""
         ext = os.path.splitext(filename)[1].lower()
-        if use_ocr and hasattr(self.llm_client, "get_response_with_file"):
+        if with_ocr and hasattr(self.llm_client, "get_response_with_file"):
             system_prompt = "Eres un sistema OCR. Extrae todo el texto legible de este documento/imagen de la forma mas fiel posible. Ignora ruido de fondo."
             extracted_text = await self.llm_client.get_response_with_file(system_prompt, "Por favor, extrae el texto de este documento.", file_bytes, "application/pdf" if ext == ".pdf" else "image/jpeg")
         else:
@@ -157,7 +167,13 @@ class RepoReader:
                 extracted_text = file_bytes.decode('utf-8', errors='ignore')
                 
         # 3. Leer AGENTS.md para inyectarlo como contexto (si existe)
-        agents_md_path = os.path.join(local_path, "material-oficial", "AGENTS.md")
+        agents_md_path = os.path.join(local_path, base_dir, "AGENTS.md")
+        if not os.path.exists(agents_md_path):
+            if is_teacher:
+                agents_md_path = os.path.join(local_path, "AGENTS.md") # Repositorio oficial
+            else:
+                agents_md_path = os.path.join(local_path, "material-oficial", "AGENTS.md")
+        
         agents_content = ""
         if os.path.exists(agents_md_path):
             with open(agents_md_path, "r", encoding="utf-8") as f:
@@ -220,7 +236,7 @@ class RepoReader:
         archivos_creados = []
         
         for path_rel, content in file_matches:
-            file_path_rel = path_rel.strip()
+            file_path_rel = os.path.join(base_dir, path_rel.strip())
             file_content = content.strip() + "\n"
                 
             if not file_path_rel or not file_content:
@@ -235,12 +251,12 @@ class RepoReader:
             archivos_creados.append(file_path_rel)
             
         # 6. Escribir en bitacora/log.md
-        bitacora_dir = os.path.join(local_path, "bitacora")
+        bitacora_dir = os.path.join(local_path, base_dir, "bitacora")
         os.makedirs(bitacora_dir, exist_ok=True)
         log_path = os.path.join(bitacora_dir, "log.md")
         
         fecha = datetime.now().strftime("%Y-%m-%d")
-        modo_extraccion = "OCR Multimodal (Gemini)" if use_ocr else "Extracción de texto normal (PyPDF)"
+        modo_extraccion = "OCR Multimodal (Gemini)" if with_ocr else "Extracción de texto normal (PyPDF)"
         log_entry = f"\n\n## [{fecha}] ingest | {filename}\n"
         log_entry += f"- **Archivo origen**: `raw/{filename}`\n"
         log_entry += f"- **Método de extracción**: {modo_extraccion}\n"
@@ -262,19 +278,24 @@ class RepoReader:
             if "nothing to commit" not in str(e).lower():
                 raise
 
-    async def revert_last_ingest(self, repo_url: str, official_repo_url: str, git_provider: str) -> bool:
+    async def revert_last_ingest(self, mapeo_data: Dict[str, Any]) -> bool:
         """! 
         @brief Revierte la ultima operacion de ingesta OKF en el repositorio.
         
         Comprueba si el ultimo commit corresponde a una ingesta automatica. De ser asi,
         ejecuta un `git revert`, documenta los archivos borrados en la bitacora y hace push.
         
-        @param repo_url URL del repositorio.
-        @param official_repo_url URL del repositorio oficial.
-        @param git_provider Proveedor de Git ('github' o 'gitlab').
+        @param mapeo_data Diccionario de datos del mapeo (repo, provieder, roles, etc).
         @return True si se pudo revertir exitosamente, False si la ultima accion no era una ingesta.
         @throws RepoReaderError si falla la operacion de git o hay conflictos.
         """
+        repo_url = mapeo_data.get('repo_url')
+        official_repo_url = mapeo_data.get('official_repo_url')
+        git_provider = mapeo_data.get('git_provider')
+        is_teacher = mapeo_data.get("is_teacher", False)
+        moodle_username = mapeo_data.get("moodle_username", "unknown")
+        
+        base_dir = f"profesores/{moodle_username}" if is_teacher else "."
         from git_utils import asegurar_repo_local
         safe_name = urllib.parse.quote_plus(repo_url)
         local_path = os.path.join(self.repos_dir, safe_name)
@@ -307,7 +328,7 @@ class RepoReader:
             raise RepoReaderError(f"No se pudo revertir la ultima ingesta debido a conflictos de Git: {e}")
             
         # Anadir a la bitacora
-        bitacora_dir = os.path.join(local_path, "bitacora")
+        bitacora_dir = os.path.join(local_path, base_dir, "bitacora")
         os.makedirs(bitacora_dir, exist_ok=True)
         log_path = os.path.join(bitacora_dir, "log.md")
         
@@ -324,7 +345,8 @@ class RepoReader:
             f.write(log_entry)
             
         # Comitear la reversion
-        await self._run_git_command("git add bitacora/log.md", local_path)
+        log_repo_path = os.path.join(base_dir, "bitacora", "log.md").replace("\\", "/")
+        await self._run_git_command(f"git add {log_repo_path}", local_path)
         await self._run_git_command('git config user.email "bot@llm-wiki.com"', local_path)
         await self._run_git_command('git config user.name "LLM Wiki Bot"', local_path)
         await self._run_git_command('git commit -m "Reversion automatica de la ultima ingesta"', local_path)
