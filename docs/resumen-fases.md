@@ -255,3 +255,25 @@ Se implementó el encolado asíncrono para registrar el flujo completo RAG de in
 - **Idempotencia de Logs**: Los fallos puntuales de `git push` lanzarán un reintento del Job. El código valida el hash del nuevo log JSON contra el fichero existente en disco previniendo duplicidades e ignorando selectivamente el commit si ya había transitado localmente.
 - **Doble Orquestación**: Se segregó el escalado del worker (`sync-worker-1` y `sync-worker-2` independientes) en `docker-compose.yml` sorteando la limitación sintáctica de `deploy.replicas` en entornos no-Swarm.
 - **Tolerancia a fallos en UI**: El encolado de interacciones implementa un fallback (`try/except`) para que, ante saturación del broker Redis, la experiencia del usuario (respuestas por chat) permanezca intacta (degradación grácil).
+
+## Fase 7: Consolidación de Tests y Corrección de Regresiones
+
+### Resumen de la Fase
+El objetivo principal de esta fase fue unificar las distintas suites de pruebas de los subsistemas (API, Plugin Moodle, Bot/Worker y Documentación) bajo un único orquestador automatizado y resolver las regresiones detectadas en el refactor de proveedores Git de la Fase 4.2.
+
+### Cambios Técnicos
+- **Orquestador de Pruebas (`instalar.sh --test`)**:
+  - Se introdujo el flag `--test` en `instalar.sh` (con opción `--full` para forzar la recreación desde cero del entorno Docker y borrado de variables).
+  - El script orquesta la ejecución en **5 bloques independientes**, evitando que un fallo temprano (ej. en Moodle) detenga la ejecución del resto de las pruebas. Al finalizar, vuelca una tabla resumen con los resultados de:
+    - **Bloque A (Infraestructura)**: Test de puertos y servicios con `test-services.sh`.
+    - **Bloque B (API Mapeo)**: Migraciones Alembic automáticas y suite de `pytest`. Se adaptaron rutas y configuraciones para que `pytest` se ejecute mapeando directorios internos del contenedor.
+    - **Bloque C (Moodle)**: Detección inteligente del estado de `PHPUnit`. Si el entorno no está inicializado, el script lanza silenciosamente `composer install`, el *build* e *init* de PHPUnit antes de ejecutar las pruebas del plugin `block_bdc`.
+    - **Bloque D (Bot / Worker)**: Pruebas unitarias de Maubot usando `pytest` internamente en el contenedor worker.
+    - **Bloque E (Documentación)**: Validación estricta con Doxygen (`cmd_docs check`).
+- **Resolución de Regresiones en Pruebas**:
+  - Se detectó y resolvió una regresión importante originada en la Fase 4.2, donde los tests originales de creación de repositorio en GitHub se eliminaron por error.
+  - Se restauró la cobertura completa rescribiendo `test_github_provider.py`, adaptado ahora a interactuar con la abstracción `GitHubProvider` invocada por el Factory.
+  - Cobertura validada: creación de repositorios exitosa, reutilización de repositorios existentes, manejo asertivo de respuestas fallidas (HTTP 500) y parseo correcto de la variable `GITHUB_PAT` tanto por el entorno como por el fichero `.env`.
+- **Exclusiones Conscientes**:
+  - Scripts interactivos o sin código de salida fiable (como `test_race.py`) y comprobaciones que fuerzan reinicios abruptos (`hot-reload`) se mantienen exclusivamente para comprobaciones manuales, garantizando la fiabilidad de CI/CD para el resto del sistema.
+  - La idempotencia profunda (e.g. clonado resiliente de GitLab) queda registrada y documentada como deuda técnica menor.

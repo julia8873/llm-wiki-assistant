@@ -98,6 +98,10 @@ Fase 3 (Sincronización):
 
 Fase 5 (Bot LLM):
   bot package              Empaqueta el plugin de Maubot (.mbp).
+
+Fase 7 (Tests Consolidados):
+  --test [--full]          Ejecuta toda la batería de pruebas (Fases 0-6).
+                           Con --full se reinicia la infraestructura desde cero.
 EOF
   exit 0
 }
@@ -376,10 +380,134 @@ cmd_bot() {
       ;;
   esac
 }
+
+## @fn cmd_test()
+## @brief Ejecuta de forma consolidada todos los tests del proyecto.
+cmd_test() {
+  local is_full=false
+  for arg in "$@"; do
+    if [[ "$arg" == "--full" ]]; then
+      is_full=true
+    fi
+  done
+
+  info "=== INICIANDO BATERÍA DE TESTS (FASE 7) ==="
+
+  if [[ "$is_full" == "true" ]]; then
+    info "Modo --full detectado: Destruyendo infraestructura y reseteando entorno..."
+    cd "${ROOT_DIR}/moodle-matrix-dev"
+    docker compose down -v 2>/dev/null || true
+    rm -f .env
+    cd "${ROOT_DIR}"
+    ./instalar.sh
+  fi
+
+  local res_infra="[ FALLO ]"
+  local res_api="[ FALLO ]"
+  local res_moodle="[ FALLO ]"
+  local res_worker="[ FALLO ]"
+  local res_docs="[ FALLO ]"
+  local global_exit=0
+
+  # Evitamos que set -e corte la ejecución en caso de fallo de un bloque
+  set +e
+
+  # a. Test de infraestructura Docker (Fase 1)
+  info "--- Ejecutando bloque A: Infraestructura ---"
+  if "${ROOT_DIR}/moodle-matrix-dev/scripts/test-services.sh"; then
+    res_infra="[ PASA  ]"
+  else
+    warn "Fallo en el bloque de Infraestructura."
+    global_exit=1
+  fi
+
+  # b. Tests de mapeo-api (Fases 2, 4, 4.2, 5.1)
+  info "--- Ejecutando bloque B: mapeo-api ---"
+  local api_fail=0
+  docker exec moodle-matrix-dev-mapeo-api-1 alembic upgrade head || api_fail=1
+  # Copy tests into the container since they are not mounted by default
+  docker cp "${ROOT_DIR}/moodle-matrix-dev/mapeo-api/tests" moodle-matrix-dev-mapeo-api-1:/code/tests
+  docker exec moodle-matrix-dev-mapeo-api-1 pytest /code/tests || api_fail=1
+  if [[ "$api_fail" -eq 0 ]]; then
+    res_api="[ PASA  ]"
+  else
+    warn "Fallo en el bloque de mapeo-api (pytest o alembic)."
+    global_exit=1
+  fi
+
+  # c. Tests PHPUnit del bloque Moodle (Fase 3)
+  info "--- Ejecutando bloque C: Moodle (PHPUnit) ---"
+  local moodle_fail=0
+  
+  # Check if PHPUnit is initialized
+  local phpunit_status
+  phpunit_status=$(docker exec -w /bitnami/moodle moodle-matrix-dev-moodle-1 php admin/tool/phpunit/cli/util.php --diag 2>&1)
+  if echo "$phpunit_status" | grep -qiE "not initialized|Can not find PHPUnit"; then
+    info "PHPUnit no inicializado. Procediendo a configurarlo (esto tomará un tiempo)..."
+    # Bitnami image fallback logic for composer
+    docker exec -w /bitnami/moodle moodle-matrix-dev-moodle-1 bash -c "if [ ! -f composer.phar ]; then curl -sS https://getcomposer.org/installer | php; fi" || moodle_fail=1
+    docker exec -w /bitnami/moodle moodle-matrix-dev-moodle-1 php composer.phar install --no-interaction --quiet || moodle_fail=1
+    docker exec -w /bitnami/moodle moodle-matrix-dev-moodle-1 php admin/tool/phpunit/cli/util.php --build || moodle_fail=1
+    docker exec -w /bitnami/moodle moodle-matrix-dev-moodle-1 php admin/tool/phpunit/cli/init.php || moodle_fail=1
+  fi
+
+  if [[ "$moodle_fail" -eq 0 ]]; then
+    docker exec -w /bitnami/moodle moodle-matrix-dev-moodle-1 php vendor/bin/phpunit blocks/bdc/tests/bdc_creation_test.php || moodle_fail=1
+  fi
+
+  if [[ "$moodle_fail" -eq 0 ]]; then
+    res_moodle="[ PASA  ]"
+  else
+    warn "Fallo en el bloque de Moodle (PHPUnit)."
+    global_exit=1
+  fi
+
+  # d. Tests Python del bot / worker (Fases 5, 5.1, 6)
+  info "--- Ejecutando bloque D: Bot / Worker (pytest) ---"
+  if docker exec moodle-matrix-dev-sync-worker-1 bash -c "cd /data/llm-wiki-assistant-plugin && pytest tests/"; then
+    res_worker="[ PASA  ]"
+  else
+    warn "Fallo en el bloque de Worker/Bot (pytest)."
+    global_exit=1
+  fi
+  info "NOTA: El script test_race.py y el test de hot-reload quedan fuera de esta ejecución automatizada por su naturaleza interactiva/disruptiva."
+
+  # e. Validación Doxygen en modo estricto
+  info "--- Ejecutando bloque E: Doxygen ---"
+  if cmd_docs check; then
+    res_docs="[ PASA  ]"
+  else
+    warn "Fallo en el bloque de Doxygen (estricto)."
+    global_exit=1
+  fi
+
+  set -e
+
+  echo ""
+  echo "=== RESUMEN DE BATERÍA DE TESTS ==="
+  echo "A. Infraestructura Docker : $res_infra"
+  echo "B. API Mapeo              : $res_api"
+  echo "C. Moodle (PHPUnit)       : $res_moodle"
+  echo "D. Bot y Sync Worker      : $res_worker"
+  echo "E. Doxygen (estricto)     : $res_docs"
+  echo "==================================="
+
+  if [[ "$global_exit" -ne 0 ]]; then
+    error "La batería de tests falló en uno o más subsistemas (ver detalle arriba)."
+  else
+    ok "Todos los subsistemas pasaron con éxito."
+  fi
+}
 ## @fn main()
 ## @brief Procesador de línea de comandos. Enruta argumentos a subfunciones.
 ## @param $@ Argumentos pasados al script.
 main() {
+  if [[ "${1:-}" == "--test" ]]; then
+    shift
+    cmd_test "$@"
+    return
+  fi
+
   [[ $# -eq 0 ]] && { cmd_install_all; return; }
 
   local cmd="$1"; shift || true

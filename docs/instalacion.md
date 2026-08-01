@@ -66,6 +66,17 @@ Para validar el flujo completo desde la interfaz, es necesario iniciar sesión e
 
 > Nota: este usuario se ha creado manualmente en Moodle para realizar pruebas de integración del flujo actual.
 
+### Ejecución de Pruebas Automatizadas (Fase 7)
+Para validar la salud de todos los subsistemas integrados (API, Worker, Moodle, Infraestructura, Documentación), el proyecto cuenta con un orquestador central de tests.
+
+```bash
+./instalar.sh --test
+```
+Si deseas ejecutar los tests desde cero reconstruyendo todos los contenedores y limpiando variables previas:
+```bash
+./instalar.sh --test --full
+```
+
 ### Comandos de Operación
 | Comando | Acción |
 |---|---|
@@ -76,3 +87,4 @@ Para validar el flujo completo desde la interfaz, es necesario iniciar sesión e
 | `./instalar.sh git setup` | Configura repositorios base (Fase 1). |
 | `./instalar.sh bot sync` | Fuerza sincronización base de datos Moodle -> Matrix (Fase 3). |
 | `./instalar.sh bot package` | Compila y empaqueta el plugin del bot en formato `.mbp` (Fase 5). |
+| `./instalar.sh --test [--full]` | Ejecuta batería consolidada de tests de todos los subsistemas (Fase 7). |
