@@ -14,7 +14,13 @@ from mixins.mapeo_client import MapeoClient, MapeoClientError
 from mixins.repo_reader import RepoReader, RepoReaderError
 from mixins.vector_store import VectorStore
 from mixins.llm_clients import get_llm_client, LLMClientError
-from sync_worker.tasks import _async_sync_repo_task
+from sync_worker.tasks import _async_sync_repo_task, log_interaction_task
+import redis
+from rq import Queue, Retry
+
+# Cola para logs de interacción (cliente síncrono estándar para encolar rápidamente sin async)
+redis_conn = redis.Redis(host='redis', port=6379)
+log_queue = Queue('log-jobs', connection=redis_conn)
 
 class Config(BaseProxyConfig):
     def do_update(self, helper: ConfigUpdateHelper) -> None:
@@ -271,6 +277,36 @@ class LLMWikiAssistantPlugin(Plugin):
             response_text = await self.llm_client.get_response(system_prompt_with_context, user_prompt)
             
             await evt.respond(response_text)
+            
+            # 5. Encolar log de interacción (RAG) asíncronamente
+            import datetime
+            try:
+                # Extraer lista de ficheros consultados
+                ficheros_consultados = [chunk['file_path'] for chunk in results] if results else []
+                log_data = {
+                    "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+                    "matrix_room_id": room_id,
+                    "mensaje_alumno": query,
+                    "respuesta_bot": response_text,
+                    "ficheros_consultados": ficheros_consultados,
+                    "git_provider": "github"
+                }
+                
+                log_queue.enqueue(
+                    log_interaction_task,
+                    kwargs={
+                        "matrix_room_id": room_id,
+                        "repo_alumno_url": repo_url,
+                        "official_repo_url": official_repo_url,
+                        "log_data": log_data
+                    },
+                    job_timeout="5m",
+                    retry=Retry(max=3, interval=[10, 30, 60])
+                )
+                self.log.info(f"Log de interacción encolado exitosamente para la sala {room_id}")
+            except Exception as log_error:
+                # Log de advertencia silencioso para no descartar la respuesta ya dada
+                self.log.warning(f"Error al encolar log de interacción para la sala {room_id}: {log_error}")
             
         except MapeoClientError as e:
             self.log.error(f"Error de mapeo: {e}")

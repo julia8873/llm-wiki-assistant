@@ -20,4 +20,6 @@ Definidos centralmente en `config/config.yaml`.
 | Element Web | `8081` | `80` | Cliente web Matrix. |
 | Maubot | `29317` | `29317` | Backend de ejecución del bot. |
 | Doxygen | `8005` | `8000` | Servidor de documentación HTML. |
+| Redis | `6379` | `6379` | Broker de colas para tareas asíncronas (Fase 5.1). |
+| Sync Worker | N/A | N/A | Worker RQ interno para sincronización ascendente (Fase 5.1). |
 | Ollama | `11434` | `11434` | Inferencia LLM local (Opcional). |

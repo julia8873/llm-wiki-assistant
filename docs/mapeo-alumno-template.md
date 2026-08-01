@@ -10,11 +10,14 @@ El bloque `block_bdc` genera su propia sala privada para el alumno. Se recomiend
 ## Microservicio `mapeo-api`
 En la Fase 2, se abstrajo el almacén de mapeos a un microservicio FastAPI + SQLite, asegurando el aislamiento arquitectónico. 
 
-El modelo ORM subyacente maneja la triada relacional:
+El modelo ORM subyacente maneja la entidad relacional:
 - `moodle_user_id` (Integer, Unique con course_id)
 - `moodle_course_id` (Integer)
-- `github_fork_url` (String)
+- `repo_url` (String)
+- `official_repo_url` (String)
+- `git_provider` (String)
 - `matrix_room_id` (String)
+- `estado` (String)
 
 ## Flujo de Creación (block_bdc)
 El siguiente diagrama detalla la arquitectura de idempotencia implementada en `block_bdc/view.php` para evitar salas duplicadas al hacer doble-clic:

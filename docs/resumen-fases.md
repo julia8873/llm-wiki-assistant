@@ -210,15 +210,30 @@ Esta sub-fase se implementó para resolver el flujo de actualización bidireccio
 - **Motor de Git Centralizado (`git_utils.py`)**:
   - Lógica para asegurar el clonado, la inyección dinámica de credenciales OAuth (para GitHub HTTPS con PAT) y, críticamente, la asignación del remoto `upstream` apuntando al repositorio del profesor.
 - **Flujo de Sincronización Total (Git Archive)**:
-  - Se sustituyó el *checkout selectivo* por un `git archive upstream/main | tar -x --exclude='logs' -C material-oficial/`. Esto garantiza que la carpeta `material-oficial/` siempre contenga una réplica 100% fiel de toda la estructura del profesor, sin conflictos de historial y excluyendo inteligentemente los logs privados del docente.
+  - Se sustituyó el *checkout selectivo* por un `git archive upstream/main | tar -x --exclude='logs' --exclude='logs/*' --exclude='bitacora' --exclude='bitacora/*' --exclude='profesores/*/logs' --exclude='profesores/*/logs/*' --exclude='profesores/*/bitacora' --exclude='profesores/*/bitacora/*' --exclude='profesores/*/okf/log.md' -C material-oficial/`. Esto garantiza que la carpeta `material-oficial/` siempre contenga una réplica fiel de la estructura didáctica del profesor, excluyendo inteligentemente tanto las carpetas raíz de `logs`/`bitacora` del repositorio base como las carpetas privadas de cada docente, previniendo sobreescrituras en el repositorio del estudiante.
   - Tras extraer los ficheros, el bot adjunta automáticamente una entrada de registro al archivo `logs/log.txt` de la raíz del alumno, realiza un commit (firmando incondicionalmente como `LLM Wiki Assistant`) y un push al `origin` del estudiante.
 - **Integración con Maubot**:
   - Notificación activa a través de un HTTP POST directamente a la API de Synapse (`/_matrix/client/v3/rooms/{room_id}/send/m.room.message`) informando al estudiante que su material oficial ha sido actualizado automáticamente.
   - Implementación del comando manual `!sincronizar` / `!sync` en `assistant.py` para forzar la actualización a demanda.
 - **Reorganización Estructural**:
   - Búsqueda de las reglas del bot reorientada desde `/AGENTS.md` local a `material-oficial/AGENTS.md`.
+- **Corrección de Problemas de Hot-Reload en Python**:
+  - Se previno un error crítico (`ZipImportError: bad local file header`) que ocurría si el plugin `.mbp` era reconstruido mientras el contenedor Maubot estaba levantado. La solución consistió en promover la importación del módulo de tareas de sincronización (`_async_sync_repo_task`) a la cabecera del archivo `assistant.py`, evitando así importaciones diferidas (*lazy imports*) que accedieran a índices de archivo ZIP cacheados y obsoletos.
 
 ### Pruebas Realizadas
 - **Idempotencia de Git**: Ejecución repetida de clonado sin borrar la carpeta `/tmp/llm_wiki_repos` para certificar la actualización segura (`fetch`/`reset`).
 - **Validación del Enrutamiento Worker-Redis**: Verificación en logs comprobando el inicio correcto del proceso de RQ Worker con acceso a las variables globales.
 - **Compilación Doxygen**: Se superó el filtro `WARN_AS_ERROR=YES` actualizando los docstrings de los nuevos métodos (`asegurar_repo_local`, `sync_repo_task`).
+
+## Fase 6: Registro de Interacciones y Distributed Locking
+
+### Resumen de la Fase
+Se implementó el encolado asíncrono para registrar el flujo completo RAG de interacciones (Mensaje -> Contexto -> Respuesta del LLM) hacia los repositorios de cada alumno, de forma no bloqueante para las respuestas en vivo de las salas de Matrix. Además, para proteger el árbol local de Git frente a colisiones (e.g. un sync asíncrono de un profesor interrumpiendo la escritura de logs asíncronos), se implementó un sistema estricto de cerrojo distribuido nativo.
+
+### Cambios Técnicos
+- **Distributed Locking con Redis Async**: Uso estricto de `redis.asyncio` como cerrojo (`distributed_repo_lock`) cubriendo el scope entero de las tareas de Git en el `sync-worker` (desde la preparación local hasta el `git push` final).
+  - **TTL y Heartbeat**: TTL ajustado a **60 segundos** en base a medidas reales sobre latencias de red en `git clone`/`push`. Se instauró una tarea secundaria que hace *heartbeat* (renueva el TTL) cada 20s para prevenir interrupciones prematuras.
+  - **Serialización en Espera (Inline Blocking)**: El `blocking_timeout` se ha ampliado a 30s. Ante concurrencia sobre el mismo repositorio, los procesos esperan de forma dócil y se encolan secuencialmente. Si el lock excede ese límite, se relega a reintentos pasivos de RQ.
+- **Idempotencia de Logs**: Los fallos puntuales de `git push` lanzarán un reintento del Job. El código valida el hash del nuevo log JSON contra el fichero existente en disco previniendo duplicidades e ignorando selectivamente el commit si ya había transitado localmente.
+- **Doble Orquestación**: Se segregó el escalado del worker (`sync-worker-1` y `sync-worker-2` independientes) en `docker-compose.yml` sorteando la limitación sintáctica de `deploy.replicas` en entornos no-Swarm.
+- **Tolerancia a fallos en UI**: El encolado de interacciones implementa un fallback (`try/except`) para que, ante saturación del broker Redis, la experiencia del usuario (respuestas por chat) permanezca intacta (degradación grácil).

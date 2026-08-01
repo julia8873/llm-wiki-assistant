@@ -19,8 +19,13 @@ El servicio utiliza **SQLite** y la base de datos reside en el volumen nombrado 
 | `id` | Integer | Primary Key |
 | `moodle_user_id` | Integer | Not Null |
 | `moodle_course_id` | Integer | Not Null |
-| `github_fork_url` | String | Not Null |
-| `matrix_room_id` | String | Not Null |
+| `repo_url` | String | Nullable |
+| `official_repo_url` | String | Nullable |
+| `git_provider` | String | Not Null (Defecto: github) |
+| `matrix_room_id` | String | Nullable |
+| `estado` | String | Defecto: PENDIENTE_GITHUB |
+| `is_teacher` | Integer | Defecto: 0 |
+| `moodle_username` | String | Nullable |
 | `created_at` | DateTime | Auto UTC |
 | `updated_at` | DateTime | Auto UTC onUpdate |
 
@@ -35,5 +40,7 @@ Todos los endpoints requieren el header: `Authorization: Bearer <MAPEO_API_TOKEN
 
 - **`GET /health`**: Healthcheck (200 OK). No requiere token.
 - **`POST /mapeos`**: Crea un nuevo mapeo.
+- **`POST /cursos`**: Provisión del repositorio oficial de un curso.
+- **`POST /sync/oficial-updated`**: Webhook de sincronización asíncrona para actualizar los forks de los alumnos con los cambios del material del profesor (Fase 5.1).
 - **`GET /mapeos?moodle_user_id={id}&moodle_course_id={id}`**: Busca el mapeo de un estudiante en un curso (devuelve `404` si no existe).
 - **`GET /mapeos/by-room/{matrix_room_id}`**: Busca el repositorio asignado a una sala específica de Matrix (usado por el Bot).

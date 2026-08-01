@@ -37,6 +37,7 @@ El bot es capaz de ingerir documentos (ej. PDFs o Imágenes) arrastrados al chat
 ## Comandos Interactivos
 - **`!ayuda` / `!comandos`**: Menú dinámico de asistencia.
 - **`!deshacer` / `!revertir`**: Revierte el último commit (`git revert`) en GitHub si fue una ingesta automática, borrando los conceptos generados, documentándolo en la bitácora (`log.md`) y limpiando la memoria del bot.
+- **`!sincronizar` / `!sync`**: Fuerza a demanda la actualización del repositorio del estudiante trayendo los cambios desde el material oficial del profesor (Fase 5.1).
 
 ## Configuración e Instanciación del Bot (Maubot Manager)
 

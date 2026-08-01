@@ -6,8 +6,62 @@ import os
 import asyncio
 import logging
 from typing import Optional, Tuple
+import redis.asyncio as redis
+from contextlib import asynccontextmanager
 
 logger = logging.getLogger(__name__)
+
+redis_client = redis.Redis(host='redis', port=6379, decode_responses=True)
+
+class LockAcquisitionError(Exception):
+    pass
+
+@asynccontextmanager
+async def distributed_repo_lock(destino_local: str):
+    """!
+    @brief Adquiere un cerrojo distribuido en Redis para el repositorio local.
+    @details
+    Utiliza un cliente asíncrono de Redis para evitar bloquear el event loop.
+    Incluye un TTL base de 60s (calibrado en base a ~1.6s medidos para clonado remoto)
+    y un mecanismo de renovación periódica (heartbeat) para evitar expiraciones en operaciones lentas.
+    Si el lock está ocupado, levanta LockAcquisitionError (aprovechado para reintentos en RQ).
+    """
+    lock_key = f"repo_lock:{destino_local}"
+    ttl = 60
+    lock = redis_client.lock(lock_key, timeout=ttl, blocking_timeout=30)
+    
+    acquired = await lock.acquire()
+    if not acquired:
+        raise LockAcquisitionError(f"El repositorio {destino_local} está bloqueado por otro proceso.")
+    
+    async def extend_lock_loop():
+        try:
+            while True:
+                await asyncio.sleep(ttl / 3.0)
+                try:
+                    # redis-py lock extend is async
+                    await lock.extend(ttl)
+                except Exception as e:
+                    logger.warning(f"Error renovando el lock para {destino_local}: {e}")
+                    break
+        except asyncio.CancelledError:
+            pass
+
+    heartbeat_task = asyncio.create_task(extend_lock_loop())
+    
+    try:
+        yield lock
+    finally:
+        heartbeat_task.cancel()
+        try:
+            await heartbeat_task
+        except asyncio.CancelledError:
+            pass
+        try:
+            await lock.release()
+        except Exception:
+            pass
+
 
 def asegurar_estructura_okf(base_dir: str):
     """!
@@ -19,7 +73,7 @@ def asegurar_estructura_okf(base_dir: str):
         with open(os.path.join(folder_path, ".gitkeep"), "w") as f:
             pass
 
-async def run_git_command(*args, cwd: str):
+async def run_git_command(*args, cwd=None):
     """!
     @brief Ejecuta un comando git de forma asíncrona.
     """

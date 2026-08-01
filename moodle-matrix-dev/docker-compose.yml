@@ -156,13 +156,31 @@ services:
       timeout: 5s
       retries: 5
 
-  sync-worker:
+  sync-worker-1:
     build:
       context: ./maubot
       dockerfile: Dockerfile
     container_name: moodle-matrix-dev-sync-worker-1
     working_dir: /data/llm-wiki-assistant-plugin
-    command: ["rq", "worker", "sync-jobs", "--url", "redis://redis:6379"]
+    command: ["rq", "worker", "sync-jobs", "log-jobs", "--url", "redis://redis:6379"]
+    environment:
+      - MAPEO_API_TOKEN=${MAPEO_API_TOKEN}
+      - GITHUB_PAT=${GITHUB_PAT}
+      - PYTHONPATH=/data/llm-wiki-assistant-plugin
+    volumes:
+      - ./maubot:/data
+      - ../config:/config:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  sync-worker-2:
+    build:
+      context: ./maubot
+      dockerfile: Dockerfile
+    container_name: moodle-matrix-dev-sync-worker-2
+    working_dir: /data/llm-wiki-assistant-plugin
+    command: ["rq", "worker", "sync-jobs", "log-jobs", "--url", "redis://redis:6379"]
     environment:
       - MAPEO_API_TOKEN=${MAPEO_API_TOKEN}
       - GITHUB_PAT=${GITHUB_PAT}
