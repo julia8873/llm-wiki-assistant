@@ -1,27 +1,13 @@
 # LLM Wiki Assistant
 
-[![Fase Actual](https://img.shields.io/badge/Estado-Fase_1_Completada-success.svg)](file:///c:/Users/vmira/Desktop/llm-wiki-assistant/docs/index.md)
-[![Doxygen](https://img.shields.io/badge/Docs-Doxygen-blue.svg)](file:///c:/Users/vmira/Desktop/llm-wiki-assistant/Doxyfile)
-[![LLM Multi-Provider](https://img.shields.io/badge/LLM-OpenAI_|_Gemini_|_Ollama-blue.svg)](https://github.com/julia8873/llm-wiki-assistant)
-[![Entrypoint](https://img.shields.io/badge/Entrypoint-instalar.sh-orange.svg)](https://github.com/julia8873/llm-wiki-assistant)
-[![GitHub License](https://img.shields.io/badge/Licencia-MIT-green.svg)](https://github.com/julia8873/llm-wiki-assistant)
+[![Fase Actual](https://img.shields.io/badge/Estado-Fase_7_Completada-success.svg)](docs/index.md)
+[![Doxygen](https://img.shields.io/badge/Docs-Doxygen-blue.svg)](Doxyfile)
+[![LLM Multi-Provider](https://img.shields.io/badge/LLM-OpenAI_|_Gemini_|_Ollama-blue.svg)](config/config.yaml)
+[![Entrypoint](https://img.shields.io/badge/Entrypoint-instalar.sh-orange.svg)](instalar.sh)
 
-Sistema integrado de docencia Moodle-Matrix-GitHub. Proporciona a cada estudiante una interfaz de chat inteligente en Matrix, atendida por un agente LLM acotado estrictamente a la Base de Conocimiento individual (Fork) de dicho alumno.
+Sistema integrado de docencia Moodle-Matrix-Git. Proporciona a cada estudiante una interfaz de chat inteligente en Matrix, atendida por un agente LLM acotado estrictamente a la Base de Conocimiento individual de dicho alumno (generada desde un template oficial del profesor).
 
-## Comandos Operativos Base
-
-> [!WARNING]
-> **Aviso de Seguridad en Producción (Element Web)**: Durante la fase de desarrollo e integración, se han desactivado los avisos de cifrado de extremo a extremo (E2EE) y de copias de seguridad de claves (`UIFeature.keyBackup` y `UIFeature.crossSigning`) en `moodle-matrix-dev/element-config.json` para facilitar las pruebas del bot LLM sin fricción. Antes de desplegar el entorno en producción para la Universidad, se debe evaluar si se requiere E2EE estricto y, en tal caso, volver a activar estas variables.
-
-## Funcionalidades del Bot en Matrix (OKF v0.1)
-El Bot LLM implementa una ingesta automatizada siguiendo el estándar OKF v0.1 (`AGENTS.md`). Cuando se le envía un archivo, el bot genera una abstracción completa en el repositorio, creando:
-- **Concepts**: Conceptos abstractos extraídos.
-- **Entities**: Herramientas o personas mencionadas.
-- **Sources**: Resumen general del documento.
-
-**Comandos del chat disponibles para el alumno:**
-- **`!ayuda`** o **`!comandos`**: Despliega un menú informativo con los comandos.
-- **`!deshacer`** o **`!revertir`**: Revierte la última ingesta automática en GitHub de manera segura (elimina los ficheros extraídos, actualiza la bitácora y borra el contenido de la base vectorial RAG del bot).
+*Toda la documentación técnica completa se genera vía Doxygen. Ejecuta `./instalar.sh docs serve` para acceder a ella en [http://localhost:8005](http://localhost:8005).*
 
 ## Comandos Operativos Base (Desarrollo)
 
@@ -39,7 +25,25 @@ El Bot LLM implementa una ingesta automatizada siguiendo el estándar OKF v0.1 (
 
 # Verificación estricta de documentación (Falla ante warnings)
 ./instalar.sh docs check
+
+# Ejecutar Batería de Tests Consolidada (Fase 7)
+# Ideal para verificar la instalación y salud de todos los subsistemas.
+./instalar.sh --test [--full]
 ```
+
+> [!WARNING]
+> **Aviso de Seguridad en Producción (Element Web)**: Durante la fase de desarrollo e integración, se han desactivado los avisos de cifrado de extremo a extremo (E2EE) y de copias de seguridad de claves (`UIFeature.keyBackup` y `UIFeature.crossSigning`) en `moodle-matrix-dev/element-config.json` para facilitar las pruebas del bot LLM sin fricción. Antes de desplegar el entorno en producción para la Universidad, se debe evaluar si se requiere E2EE estricto y, en tal caso, volver a activar estas variables.
+
+## Funcionalidades del Bot en Matrix (OKF v0.1)
+El Bot LLM implementa una ingesta automatizada siguiendo el estándar OKF v0.1 (`AGENTS.md`). Cuando se le envía un archivo, el bot genera una abstracción completa en el repositorio, creando:
+- **Conceptos**: Conceptos abstractos extraídos.
+- **Entidades**: Herramientas o personas mencionadas.
+- **Recursos**: Resumen general del documento.
+
+**Comandos del chat disponibles para el alumno:**
+- **`!ayuda`** o **`!comandos`**: Despliega un menú informativo con los comandos.
+- **`!deshacer`** o **`!revertir`**: Revierte la última ingesta automática en Git de manera segura.
+- **`!sincronizar`** o **`!sync`**: Fuerza la actualización de tu repositorio con el material del profesor.
 
 ## Credenciales de Prueba
 
@@ -49,27 +53,33 @@ Para probar el flujo de autenticación delegada (SSO) y la provisión de reposit
 |---------|------------|-----------------|
 | `admin` | `adminpass123` | Administrador de plataforma Moodle / Creador de plantillas |
 | `teacher1` | `Teacher1!` | Profesor del curso (gestión) |
-| `student1` | `Student1!` | Estudiante de prueba principal (Fork #1) |
-| `student2` | `Student2!` | Estudiante secundario para pruebas de concurrencia (Fork #2) |
+| `student1` | `Student1!` | Estudiante de prueba principal (Repo Alumno #1) |
+| `student2` | `Student2!` | Estudiante secundario para pruebas de concurrencia (Repo Alumno #2) |
 
 > **Nota:** Se aconseja utilizar pestañas en modo incógnito al alternar entre `student1` y `student2` para evitar que Element re-cargue sesiones guardadas previas (localStorage) e impida el acceso cruzado.
 
-## Arquitectura y Componentes
+## Inventario de Componentes y Carpetas Clave
 
-> El proyecto puede ejecutarse con el intérprete del sistema sin crear un entorno virtual. Para instalar las dependencias del microservicio, ejecuta:
->
-> `cd moodle-matrix-dev/mapeo-api && python -m pip install -r requirements.txt`
-- **Moodle (LMS)**: Orquestador de repositorios.
-- **GitHub**: Almacenamiento OKF por alumno, con el PAT centralizado en `config/config.yaml` y propagado automáticamente a `GITHUB_PAT` por `instalar.sh` al generar [moodle-matrix-dev/.env](moodle-matrix-dev/.env).
-- **Matrix/Synapse**: Servidor de chat 1:1.
-- **Maubot**: Agente LLM aislado.
+| Carpeta / Fichero | Descripción |
+|-------------------|-------------|
+| `config/config.yaml` | Única Fuente de Verdad para configuración de puertos, LLM y proveedor Git. |
+| `instalar.sh` | Orquestador principal de infraestructura y tests (`--test`). |
+| `moodle-matrix-dev/mapeo-api/` | Microservicio FastAPI que maneja los mapeos Alumno <-> Git <-> Matrix. |
+| `moodle-matrix-dev/mapeo-api/app/services/git/` | **(Fase 4.2)** Módulo de abstracción `GitProviderFactory` con implementaciones para GitHub, GitLab y Self-Hosted. |
+| `moodle-matrix-dev/maubot/llm-wiki-assistant-plugin/` | Código fuente del bot Matrix. |
+| `moodle-matrix-dev/maubot/llm-wiki-assistant-plugin/sync_worker/` | **(Fases 5.1 y 6)** Workers de RQ (Redis) encargados de la *Sincronización Ascendente* y el *Logging de Interacciones*. |
+| `moodle-matrix-dev/maubot/llm-wiki-assistant-plugin/git_utils.py` | Módulo compartido de utilidades Git usado concurrentemente por Ingesta OKF, Sync, y Logging. Contiene el *Distributed Repo Lock*. |
+| `moodle-matrix-dev/moodle_plugins/block_bdc/` | Plugin de Moodle que intercepta el inicio de sesión y llama a `mapeo-api`. |
 
-## Fases de Implementación
+## Fases de Implementación y Estado
 - ✅ **Fase 0.1**: Documentación Doxygen y Configuración Base.
 - ✅ **Fase 1**: Infraestructura Docker Compose.
-- ⏳ **Fase 2**: Bloque Moodle `block_bdc`.
-- ⏳ **Fase 3**: Sincronización Moodle-Matrix-GitHub.
-- ✅ **Fase 4**: Provisionamiento GitHub y Pruebas de Integración.
-- ⏳ **Fase 5**: Plugin Maubot `llm-wiki-assistant`.
-
-*Toda la documentación técnica se genera vía Doxygen. Ejecuta `./instalar.sh docs serve` para acceder a ella.*
+- ✅ **Fase 2**: Almacén de Mapeos (FastAPI + SQLite).
+- ✅ **Fase 3**: Bloque Moodle `block_bdc`.
+- ✅ **Fase 4**: Provisionamiento de Repositorios y Pruebas de Integración.
+- ✅ **Fase 4.2**: Refactorización de Proveedores Git (Factory / GitLab / Webhooks).
+- ✅ **Fase 5**: Plugin Maubot (LLM, RAG, y Extracción OKF).
+- ✅ **Fase 5.1**: Sincronización Ascendente (Upstream Sync).
+- ✅ **Fase 6**: Registro de Interacciones y Distributed Locking (Redis).
+- ✅ **Fase 7**: Orquestador de Pruebas Consolidado (`instalar.sh --test`) y control de regresiones.
+- 🎯 **Fase 8**: Documentación Completa.

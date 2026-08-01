@@ -1,6 +1,6 @@
 # API y Almacén de Mapeo
 
-El núcleo del sistema llm-wiki-assistant confía en una arquitectura desacoplada para vincular un Alumno con su respectiva asignatura, su repositorio GitHub (Fork) y su sala de Matrix. 
+El núcleo del sistema llm-wiki-assistant confía en una arquitectura desacoplada para vincular un Alumno con su respectiva asignatura, su repositorio Git (generado desde un template oficial) y su sala de Matrix. 
 
 ## Decisiones de Diseño (Fase 2)
 Se eligió la **Opción B (Microservicio FastAPI)** en lugar de una tabla nativa de Moodle por las siguientes razones:
@@ -39,8 +39,26 @@ Al estar desarrollado en FastAPI, la documentación interactiva OpenAPI y los es
 Todos los endpoints requieren el header: `Authorization: Bearer <MAPEO_API_TOKEN>`.
 
 - **`GET /health`**: Healthcheck (200 OK). No requiere token.
-- **`POST /mapeos`**: Crea un nuevo mapeo.
-- **`POST /cursos`**: Provisión del repositorio oficial de un curso.
-- **`POST /sync/oficial-updated`**: Webhook de sincronización asíncrona para actualizar los forks de los alumnos con los cambios del material del profesor (Fase 5.1).
-- **`GET /mapeos?moodle_user_id={id}&moodle_course_id={id}`**: Busca el mapeo de un estudiante en un curso (devuelve `404` si no existe).
-- **`GET /mapeos/by-room/{matrix_room_id}`**: Busca el repositorio asignado a una sala específica de Matrix (usado por el Bot).
+
+- **`POST /mapeos`**: Crea un nuevo mapeo aprovisionando un repositorio y una sala.
+  ```bash
+  curl -X POST "http://mapeo-api:8000/mapeos" \
+       -H "Authorization: Bearer <MAPEO_API_TOKEN>" \
+       -H "Content-Type: application/json" \
+       -d '{"moodle_user_id": 4, "moodle_course_id": 2, "moodle_username": "student"}'
+  ```
+
+- **`GET /mapeos?matrix_room_id={id}`**: Busca el mapeo asociado a una sala específica de Matrix (usado extensivamente por el Bot para localizar el repositorio).
+  ```bash
+  curl -X GET "http://mapeo-api:8000/mapeos?matrix_room_id=!xyz:localhost" \
+       -H "Authorization: Bearer <MAPEO_API_TOKEN>"
+  ```
+
+- **`POST /sync/oficial-updated`**: Webhook de sincronización asíncrona. Recibe un payload de GitHub/GitLab tras un push en el repositorio oficial y encola tareas en Redis para actualizar los repositorios de los alumnos. Validado por HMAC (`X-Hub-Signature-256`).
+  ```bash
+  # Ejemplo simplificado de cómo GitHub llama a este endpoint
+  curl -X POST "http://mapeo-api:8000/sync/oficial-updated" \
+       -H "X-Hub-Signature-256: sha256=..." \
+       -H "Content-Type: application/json" \
+       -d '{"repository": {"clone_url": "https://github.com/org/repo-Oficial.git"}}'
+  ```
