@@ -114,7 +114,9 @@ class GitHubProvider(GitProviderClient):
                 logger.warning(f"No se pudo marcar {repo_name} como template (HTTP {res.status_code})")
 
     async def generar_repo_alumno(self, nombre_repo: str, repo_oficial_url: str) -> str:
-        repo_oficial_name = repo_oficial_url.split('/')[-1].replace('.git', '')
+        # Generar a partir del template original en lugar del repo_oficial
+        # para evitar copiar carpetas de otros profesores.
+        template = self.template_repo
         
         async with await self._get_client() as client:
             check_res = await client.get(f"/repos/{self.org}/{nombre_repo}")
@@ -124,9 +126,9 @@ class GitHubProvider(GitProviderClient):
             elif check_res.status_code != 404:
                 raise GitHubProvisionError(f"Error comprobando {self.org}/{nombre_repo}: HTTP {check_res.status_code}")
 
-            logger.info(f"Generando {self.org}/{nombre_repo} a partir de {repo_oficial_name}...")
+            logger.info(f"Generando {self.org}/{nombre_repo} a partir de {template}...")
             gen_res = await client.post(
-                f"/repos/{self.org}/{repo_oficial_name}/generate",
+                f"/repos/{self.org}/{template}/generate",
                 json={
                     "owner": self.org,
                     "name": nombre_repo,

@@ -9,6 +9,16 @@ from typing import Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
+def asegurar_estructura_okf(base_dir: str):
+    """!
+    @brief Crea la estructura de directorios OKF v0.1 y archivos .gitkeep para forzar el rastreo en Git.
+    """
+    for folder in ["raw", "okf", "okf/concepts", "okf/entities", "okf/sources", "okf/playbooks", "bitacora", "logs"]:
+        folder_path = os.path.join(base_dir, folder.replace("/", os.sep))
+        os.makedirs(folder_path, exist_ok=True)
+        with open(os.path.join(folder_path, ".gitkeep"), "w") as f:
+            pass
+
 async def run_git_command(*args, cwd: str):
     """!
     @brief Ejecuta un comando git de forma asíncrona.
@@ -64,9 +74,9 @@ async def asegurar_repo_local(repo_alumno_url: str, official_repo_url: Optional[
         if code != 0:
             logger.warning(f"Error en fetch origin: {err}")
             
-        code, out, err = await run_git_command('reset', '--hard', 'origin/main', cwd=destino_local)
+        code, out, err = await run_git_command('reset', '--hard', 'origin/HEAD', cwd=destino_local)
         if code != 0:
-            logger.warning(f"Error en reset origin/main: {err}")
+            logger.warning(f"Error en reset origin/HEAD: {err}")
 
     # Set author for bot commits (alway ensure it's set)
     await run_git_command('config', 'user.name', 'LLM Wiki Assistant', cwd=destino_local)

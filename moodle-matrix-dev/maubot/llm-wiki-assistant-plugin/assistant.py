@@ -14,6 +14,7 @@ from mixins.mapeo_client import MapeoClient, MapeoClientError
 from mixins.repo_reader import RepoReader, RepoReaderError
 from mixins.vector_store import VectorStore
 from mixins.llm_clients import get_llm_client, LLMClientError
+from sync_worker.tasks import _async_sync_repo_task
 
 class Config(BaseProxyConfig):
     def do_update(self, helper: ConfigUpdateHelper) -> None:
@@ -194,8 +195,6 @@ class LLMWikiAssistantPlugin(Plugin):
             await evt.respond("Comprobando el historial... intentando revertir la última ingesta de documento.")
             try:
                 mapeo_data = await self.mapeo_client.get_room_mapping(room_id)
-                repo_url = mapeo_data.get('repo_url')
-                official_repo_url = mapeo_data.get('official_repo_url')
                 success = await self.repo_reader.revert_last_ingest(mapeo_data)
                 if success:
                     # Re-indexar para borrar de la BD vectorial los documentos borrados
@@ -215,7 +214,6 @@ class LLMWikiAssistantPlugin(Plugin):
                 repo_url = mapeo_data.get('repo_url')
                 official_repo_url = mapeo_data.get('official_repo_url')
                 # Ejecutamos la tarea de sync directamente (bloqueando) para el comando manual
-                from sync_worker.tasks import _async_sync_repo_task
                 await _async_sync_repo_task(room_id, repo_url, official_repo_url)
                 
                 # Re-indexar el repo

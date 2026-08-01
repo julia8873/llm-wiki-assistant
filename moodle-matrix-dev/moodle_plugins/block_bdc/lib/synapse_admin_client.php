@@ -162,6 +162,10 @@ class block_bdc_synapse_admin_client {
         $status = $curl->get_info()['http_code'];
 
         if ($status !== 200) {
+            // Synapse returns 403 if the user is already in the room
+            if ($status === 403 && strpos($response, 'already in the room') !== false) {
+                return;
+            }
             throw new moodle_exception('error_join_room', 'block_bdc', '', $response);
         }
     }

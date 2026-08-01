@@ -6,7 +6,7 @@ import os
 import asyncio
 import logging
 import httpx
-from git_utils import asegurar_repo_local, run_git_command
+from git_utils import asegurar_repo_local, run_git_command, asegurar_estructura_okf
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,7 @@ async def _async_sync_repo_task(matrix_room_id: str, repo_alumno_url: str, offic
         
         # 4. Extraer TODO el repositorio upstream en la carpeta material-oficial
         process_tar = await asyncio.create_subprocess_shell(
-            "git archive upstream/main | tar -x --exclude='logs' -C material-oficial/",
+            "git archive upstream/main | tar -x --exclude='logs' --exclude='logs/*' --exclude='bitacora' --exclude='bitacora/*' --exclude='profesores/*/logs' --exclude='profesores/*/logs/*' --exclude='profesores/*/bitacora' --exclude='profesores/*/bitacora/*' --exclude='profesores/*/okf/log.md' -C material-oficial/",
             cwd=destino_local,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
@@ -49,6 +49,28 @@ async def _async_sync_repo_task(matrix_room_id: str, repo_alumno_url: str, offic
         out_tar, err_tar = await process_tar.communicate()
         if process_tar.returncode != 0:
             raise RuntimeError(f"Error extrayendo upstream a material-oficial: {err_tar.decode()}")
+
+        # 4.5. Si el estudiante no tiene AGENTS.md en la raíz, inicializar su repositorio base
+        if not os.path.exists(os.path.join(destino_local, "AGENTS.md")):
+            logger.info("Inicializando raíz del repositorio del estudiante con la plantilla base.")
+            import shutil
+            # Copiar archivos raíz del template (AGENTS.md, README.md, etc.) desde material-oficial
+            material_dir = os.path.join(destino_local, "material-oficial")
+            for item in os.listdir(material_dir):
+                if item not in [".git", "profesores", "material-oficial"]:
+                    s = os.path.join(material_dir, item)
+                    d = os.path.join(destino_local, item)
+                    if not os.path.exists(d):
+                        if os.path.isdir(s):
+                            shutil.copytree(s, d, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(s, d)
+            
+            # Asegurar carpetas clave por si Git las ignoró al estar vacías y forzar su trackeo
+            asegurar_estructura_okf(destino_local)
+            
+            # Añadir los nuevos archivos a Git
+            await run_git_command('add', '.', cwd=destino_local)
 
         # 5. Añadir entrada al log del alumno
         import datetime
@@ -105,12 +127,8 @@ async def _async_init_teacher_repo_task(matrix_room_id: str, official_repo_url: 
         # 3. Crear estructura imitando el repositorio raíz
         os.makedirs(teacher_dir, exist_ok=True)
         
-        # Creamos los directorios básicos si no los queremos copiar dinámicamente
-        for d in ["raw", "conceptos", "bitacora"]:
-            d_path = os.path.join(teacher_dir, d)
-            os.makedirs(d_path, exist_ok=True)
-            with open(os.path.join(d_path, ".gitkeep"), "w") as f:
-                f.write("")
+        # Creamos los directorios básicos mediante la función unificada
+        asegurar_estructura_okf(teacher_dir)
         
         # Copiar AGENTS.md si existe en la raíz
         agents_src = os.path.join(destino_local, "AGENTS.md")

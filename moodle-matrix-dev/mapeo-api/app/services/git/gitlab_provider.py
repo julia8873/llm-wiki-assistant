@@ -87,13 +87,15 @@ class GitLabProvider(GitProviderClient):
             logger.info(f"El repositorio {self.org}/{nombre_repo} ya existe.")
             return f"{self.api_base.split('/api')[0]}/{self.org}/{nombre_repo}.git"
             
-        repo_oficial_name = repo_oficial_url.split('/')[-1].replace('.git', '')
-        oficial_path = f"{self.org}/{repo_oficial_name}".replace("/", "%2F")
+        # Generar a partir del template original en lugar del repo_oficial
+        # para evitar copiar carpetas de otros profesores.
+        template = self.config['git']['repo_plantilla']
+        template_path = f"{self.org}/{template}".replace("/", "%2F")
 
         async with await self._get_client() as client:
-            logger.info(f"Haciendo fork alumno de {oficial_path} a {nombre_repo}...")
+            logger.info(f"Haciendo fork alumno de {template_path} a {nombre_repo}...")
             res = await client.post(
-                f"/projects/{oficial_path}/fork",
+                f"/projects/{template_path}/fork",
                 json={
                     "name": nombre_repo,
                     "path": nombre_repo,

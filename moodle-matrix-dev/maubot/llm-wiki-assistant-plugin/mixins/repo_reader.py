@@ -138,6 +138,24 @@ class RepoReader:
         local_path = os.path.join(self.repos_dir, safe_name)
         await asegurar_repo_local(repo_url, official_repo_url, local_path)
         
+        # 0. Si es profesor y no existe su directorio (o esta vacio sin AGENTS.md), clonar la plantilla
+        teacher_dir_path = os.path.join(local_path, base_dir)
+        if is_teacher and not os.path.exists(os.path.join(teacher_dir_path, "AGENTS.md")):
+            import shutil
+            os.makedirs(teacher_dir_path, exist_ok=True)
+            for item in os.listdir(local_path):
+                if item not in [".git", "profesores", "material-oficial"]:
+                    s = os.path.join(local_path, item)
+                    d = os.path.join(teacher_dir_path, item)
+                    if os.path.isdir(s):
+                        shutil.copytree(s, d, dirs_exist_ok=True)
+                    else:
+                        shutil.copy2(s, d)
+            
+            # Asegurar carpetas clave por si Git las ignoro al estar vacias y forzar su trackeo
+            from git_utils import asegurar_estructura_okf
+            asegurar_estructura_okf(teacher_dir_path)
+        
         # 1. Guardar el original en raw/
         raw_dir = os.path.join(local_path, base_dir, "raw")
         os.makedirs(raw_dir, exist_ok=True)
@@ -183,28 +201,16 @@ class RepoReader:
         prompt_conceptos = (
             "Analiza el siguiente texto extraído de un documento. Si notas que el texto es ilegible, es ruido, tiene muchísimos caracteres extraños o no tiene sentido (indicando una mala extracción), "
             "DEBES rechazarlo devolviendo EXCLUSIVAMENTE este JSON: {\"error\": \"mala_extraccion\"}.\n\n"
-            "Si el texto es legible, debes ejecutar la operación 'INGEST' sobre él, basándote en la documentación de AGENTS.md proporcionada.\n"
-            "IMPORTANTE: Las rutas de destino en este repositorio son diferentes a las de AGENTS.md. Debes usar estas equivalencias:\n"
-            "- 'okf/concepts/' -> 'conceptos/'\n"
-            "- 'okf/entities/' -> 'entidades/'\n"
-            "- 'okf/sources/' -> 'recursos/'\n\n"
+            "Si el texto es legible, debes ejecutar la operación 'INGEST' sobre él, basándote exactamente en la documentación de AGENTS.md proporcionada.\n\n"
             "NO DEVUELVAS JSON. Devuelve tu respuesta EXCLUSIVAMENTE utilizando estas etiquetas XML para estructurar los ficheros que vas a crear:\n\n"
-            "<file path=\"recursos/nombre_fuente.md\">\n"
+            "<file path=\"ruta/indicada/en/AGENTS.md/archivo.md\">\n"
             "---\n"
-            "type: Source\n"
+            "type: ...\n"
             "title: ...\n"
             "...\n"
             "---\n"
             "\n"
-            "Resumen del documento...\n"
-            "</file>\n\n"
-            "<file path=\"conceptos/concepto_extraido.md\">\n"
-            "---\n"
-            "type: Concept\n"
-            "...\n"
-            "---\n"
-            "\n"
-            "Contenido del concepto...\n"
+            "Contenido del documento...\n"
             "</file>\n\n"
             "Si el texto es basura (ruido/mala extracción), simplemente devuelve <error>mala_extraccion</error>.\n\n"
             f"--- TEXTO EXTRAIDO DEL DOCUMENTO ---\n{extracted_text}"

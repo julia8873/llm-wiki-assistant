@@ -161,13 +161,12 @@ services:
       context: ./maubot
       dockerfile: Dockerfile
     container_name: moodle-matrix-dev-sync-worker-1
-    # Nos situamos en el directorio del plugin para que RQ pueda importar los módulos
-    working_dir: /data/plugins/llm-wiki-assistant-plugin
+    working_dir: /data/llm-wiki-assistant-plugin
     command: ["rq", "worker", "sync-jobs", "--url", "redis://redis:6379"]
     environment:
       - MAPEO_API_TOKEN=${MAPEO_API_TOKEN}
       - GITHUB_PAT=${GITHUB_PAT}
-      - PYTHONPATH=/data/plugins/llm-wiki-assistant-plugin
+      - PYTHONPATH=/data/llm-wiki-assistant-plugin
     volumes:
       - ./maubot:/data
       - ../config:/config:ro
