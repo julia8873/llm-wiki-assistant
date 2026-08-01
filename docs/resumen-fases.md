@@ -163,6 +163,24 @@ Una vez creado, se matricula en un curso de prueba y se ejecuta la acción del b
 
 ---
 
+## Fase 4.2: Abstracción de Proveedores Git (GitHub, GitLab, OSL)
+Esta sub-fase permitió independizar el sistema del proveedor único GitHub, introduciendo una capa de abstracción para soportar múltiples plataformas Git (como GitLab o servicios autoalojados de la universidad) y preparando la base de datos para entornos de producción.
+
+### Desarrollo e Implementación
+- **Interfaz `GitProviderClient`**: Se refactorizó el servicio de aprovisionamiento (`github_service.py` pasó a estar gobernado por el `GitProviderFactory`) para que el sistema pueda inyectar dinámicamente la implementación correspondiente según la configuración.
+- **Implementación de GitLab**:
+  - Debido a que la API de exportación/importación de GitLab es asíncrona, se optó por una estrategia síncrona ("Fork + Delete"). El sistema clona el repositorio oficial mediante un fork y automáticamente rompe el vínculo (`DELETE /projects/:id/fork`), emulando perfectamente la funcionalidad de "Use this template" de GitHub sin latencias de espera.
+- **Preparación para Proveedor Autoalojado (OSL)**:
+  - Se estructuró un `self_hosted_provider.py` que actualmente lanza un error documentado indicando cómo configurarlo una vez se determine la plataforma exacta (ej. Gitea/Forgejo mediante endpoint `/generate` o GitLab CE/EE reutilizando el cliente de GitLab).
+- **Migraciones con Alembic (mapeo-api)**:
+  - Se introdujo Alembic para gestionar de forma profesional las migraciones de la base de datos (SQLite) del microservicio de mapeos, reemplazando la creación estática inicial y preparando el terreno para escalar el esquema en producción.
+
+### Pruebas Realizadas
+- **Pruebas de Factory**: Validaciones unitarias sobre la inyección de dependencias (`test_git_provider_factory.py`) para confirmar que el sistema instancie correctamente el proveedor definido en la configuración sin romper la lógica existente.
+- **Migración Baseline**: Borrado y recreación de la base de datos efímera aplicando Alembic exitosamente, garantizando un flujo CI/CD sin fricciones.
+
+---
+
 ## Fase 5: Plugin Maubot (Asistente LLM) e Ingesta OKF v0.1
 Esta fase representa el núcleo de la Inteligencia Artificial del proyecto. Se desarrolló el plugin nativo para Maubot capaz de gestionar conversaciones en salas de Matrix, ingerir documentos y orquestar comandos interactivos aplicando el estándar OKF v0.1.
 
