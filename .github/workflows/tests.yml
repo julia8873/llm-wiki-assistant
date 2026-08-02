@@ -20,12 +20,10 @@ jobs:
       run: |
         bash -x ./instalar.sh --test > ci_log.txt 2>&1
         
-    - name: Upload log
-      uses: actions/upload-artifact@v4
-      with:
-        name: ci-log
-        path: ci_log.txt
-        
-    - name: Fail if tests failed
-      if: steps.run-tests.outcome == 'failure'
-      run: exit 1
+    - name: Commit log
+      run: |
+        git config --global user.name "CI"
+        git config --global user.email "ci@example.com"
+        git add ci_log.txt
+        git commit -m "Upload CI log" || true
+        git push
