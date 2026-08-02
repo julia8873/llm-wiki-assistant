@@ -15,6 +15,17 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Run Test Suite
-      # Ejecuta la batería de pruebas en modo estándar (sin --full)
+      id: run-tests
+      continue-on-error: true
       run: |
-        bash ./instalar.sh --test
+        bash -x ./instalar.sh --test > ci_log.txt 2>&1
+        
+    - name: Upload log
+      uses: actions/upload-artifact@v4
+      with:
+        name: ci-log
+        path: ci_log.txt
+        
+    - name: Fail if tests failed
+      if: steps.run-tests.outcome == 'failure'
+      run: exit 1
