@@ -178,6 +178,13 @@ cmd_docs() {
 ### @fn generate_env()
 ## @brief Genera el fichero .env combinando config.yaml y .env.example
 generate_env() {
+  # 1. Copiar plantillas si no existen y generar .env
+  copy_if_missing "${ROOT_DIR}/.env.example"                                      "${ROOT_DIR}/.env"
+  copy_if_missing "${ROOT_DIR}/config/config.yaml.example"                        "${ROOT_DIR}/config/config.yaml"
+  copy_if_missing "${ROOT_DIR}/moodle-matrix-dev/maubot/base-config.yaml.example" "${ROOT_DIR}/moodle-matrix-dev/maubot/base-config.yaml"
+  copy_if_missing "${ROOT_DIR}/moodle-matrix-dev/maubot/config.yaml.example"      "${ROOT_DIR}/moodle-matrix-dev/maubot/config.yaml"
+  copy_if_missing "${ROOT_DIR}/moodle-matrix-dev/.env.example" "${ROOT_DIR}/moodle-matrix-dev/.env"
+  
   local env_file="${ROOT_DIR}/moodle-matrix-dev/.env"
   local example_file="${ROOT_DIR}/moodle-matrix-dev/.env.example"
   
