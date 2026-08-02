@@ -5,7 +5,7 @@ from unittest.mock import patch, MagicMock, AsyncMock
 from mixins.mapeo_client import MapeoClient, MapeoClientError
 from mixins.repo_reader import RepoReader
 from mixins.vector_store import VectorStore
-from assistant import LLMWikiAssistantPlugin
+from bot import LLMWikiAssistantPlugin
 
 @pytest.fixture
 def mock_mapeo_client():
@@ -81,3 +81,28 @@ async def test_response_not_found(mock_mapeo_client, mock_vector_store, mock_llm
     await mock_llm_client.get_response("fake_sys", expected_user_prompt)
     
     mock_llm_client.get_response.assert_called_with("fake_sys", expected_user_prompt)
+
+@pytest.mark.asyncio
+async def test_git_provider_credential_injection():
+    # El test "usa el factory de la Fase 4.2 con un provider de prueba... 
+    # para validar que la elección de credencial depende de git_provider"
+    
+    config = {
+        "git": {
+            "github": {"pat_env_var": "GH_PAT"},
+            "fake": {"token_env_var": "FAKE_TOKEN"}
+        }
+    }
+    
+    from mixins.repo_reader import RepoReader
+    
+    with patch.dict('os.environ', {'GH_PAT': 'secret1', 'FAKE_TOKEN': 'secret2'}):
+        reader = RepoReader(config, MagicMock(), MagicMock())
+        
+        # Test GitHub (usa GITHUB_PAT o GH_PAT según config)
+        url_github = reader._inject_token("https://github.com/a/b", "github")
+        assert "secret1" in url_github
+        
+        # Test Fake
+        url_fake = reader._inject_token("https://fake.com/a/b", "fake")
+        assert "secret2" in url_fake

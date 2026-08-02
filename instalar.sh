@@ -178,13 +178,6 @@ cmd_docs() {
 ### @fn generate_env()
 ## @brief Genera el fichero .env combinando config.yaml y .env.example
 generate_env() {
-  # 1. Copiar plantillas si no existen y generar .env
-  copy_if_missing "${ROOT_DIR}/.env.example"                                      "${ROOT_DIR}/.env"
-  copy_if_missing "${ROOT_DIR}/config/config.yaml.example"                        "${ROOT_DIR}/config/config.yaml"
-  copy_if_missing "${ROOT_DIR}/moodle-matrix-dev/maubot/base-config.yaml.example" "${ROOT_DIR}/moodle-matrix-dev/maubot/base-config.yaml"
-  copy_if_missing "${ROOT_DIR}/moodle-matrix-dev/maubot/config.yaml.example"      "${ROOT_DIR}/moodle-matrix-dev/maubot/config.yaml"
-  copy_if_missing "${ROOT_DIR}/moodle-matrix-dev/.env.example" "${ROOT_DIR}/moodle-matrix-dev/.env"
-  
   local env_file="${ROOT_DIR}/moodle-matrix-dev/.env"
   local example_file="${ROOT_DIR}/moodle-matrix-dev/.env.example"
   
@@ -453,8 +446,8 @@ cmd_test() {
   local api_fail=0
   docker exec moodle-matrix-dev-mapeo-api-1 alembic upgrade head || api_fail=1
   # Copy tests into the container since they are not mounted by default
-  docker cp "${ROOT_DIR}/moodle-matrix-dev/mapeo-api/tests/." moodle-matrix-dev-mapeo-api-1:/code/tests
-  docker exec -e PYTHONPATH=/code moodle-matrix-dev-mapeo-api-1 pytest /code/tests || api_fail=1
+  docker cp "${ROOT_DIR}/moodle-matrix-dev/mapeo-api/tests" moodle-matrix-dev-mapeo-api-1:/code/tests
+  docker exec moodle-matrix-dev-mapeo-api-1 pytest /code/tests || api_fail=1
   if [[ "$api_fail" -eq 0 ]]; then
     res_api="[ PASA  ]"
   else
@@ -469,11 +462,12 @@ cmd_test() {
   # Check if PHPUnit is initialized
   local phpunit_status
   phpunit_status=$(docker exec -w /bitnami/moodle moodle-matrix-dev-moodle-1 php admin/tool/phpunit/cli/util.php --diag 2>&1)
-  if echo "$phpunit_status" | grep -qiE "not initialized|Can not find PHPUnit|different version"; then
+  if echo "$phpunit_status" | grep -qiE "not initialized|Can not find PHPUnit"; then
     info "PHPUnit no inicializado. Procediendo a configurarlo (esto tomará un tiempo)..."
     # Bitnami image fallback logic for composer
     docker exec -w /bitnami/moodle moodle-matrix-dev-moodle-1 bash -c "if [ ! -f composer.phar ]; then curl -sS https://getcomposer.org/installer | php; fi" || moodle_fail=1
     docker exec -w /bitnami/moodle moodle-matrix-dev-moodle-1 php composer.phar install --no-interaction --quiet || moodle_fail=1
+    docker exec -w /bitnami/moodle moodle-matrix-dev-moodle-1 php admin/tool/phpunit/cli/util.php --build || moodle_fail=1
     docker exec -w /bitnami/moodle moodle-matrix-dev-moodle-1 php admin/tool/phpunit/cli/init.php || moodle_fail=1
   fi
 
@@ -490,7 +484,7 @@ cmd_test() {
 
   # d. Tests Python del bot / worker (Fases 5, 5.1, 6)
   info "--- Ejecutando bloque D: Bot / Worker (pytest) ---"
-  if docker exec -e PYTHONPATH=/data/llm-wiki-assistant-plugin:/opt/maubot moodle-matrix-dev-maubot-1 sh -c "cd /data/llm-wiki-assistant-plugin && python -m pytest tests/"; then
+  if docker exec moodle-matrix-dev-sync-worker-1 bash -c "cd /data/llm-wiki-assistant-plugin && pytest tests/"; then
     res_worker="[ PASA  ]"
   else
     warn "Fallo en el bloque de Worker/Bot (pytest)."

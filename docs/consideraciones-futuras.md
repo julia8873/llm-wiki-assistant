@@ -13,7 +13,3 @@ Este documento recopila las decisiones tecnológicas aplazadas, infraestructuras
 ## Fase 9.3: Rate Limiting y Sincronización Masiva
 - En la Fase 9.3 se añadió el control de Rate Limiting para las operaciones masivas de creación y sincronización (tanto en la API HTTP como en los comandos `git push`/`git fetch` del worker).
 - **Pregunta Pendiente a IT/UGR**: Si el volumen real de alumnos/cursos concurrentes de la UGR es alto (creación masiva de repositorios al inicio de curso o sincronizaciones simultáneas muy pesadas), es posible que se dispare frecuentemente el límite secundario (Abuse Detection). ¿Conviene solicitar un PAT de organización de GitHub con límite ampliado, o coordinar con IT/UGR el volumen esperado de escritura simultánea para dimensionar esto con datos reales en vez de una estimación?
-
-## Fase 9.4: CI/CD y Alojamiento del Proyecto
-- En la Fase 9.4 se implementó un flujo de CI/CD básico mediante GitHub Actions (`.github/workflows/tests.yml`) basándose en que el código actualmente reside en GitHub.
-- **Nota Explícita sobre GitLab Institucional**: Si el proyecto migra finalmente al GitLab CE/EE institucional de la UGR, este workflow requerirá traducción obligatoria al formato `.gitlab-ci.yml`. Esto no se ha implementado aún porque la decisión final de alojamiento sigue pendiente. Además, el pipeline actual asume el mockeo local de servicios; si el entorno institucional requiere pruebas e2e con credenciales reales, se deberán excluir dichos tests de la suite de CI o manejar los secretos nativamente.

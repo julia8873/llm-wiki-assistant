@@ -81,12 +81,6 @@ Si deseas ejecutar los tests desde cero reconstruyendo todos los contenedores y 
 ./instalar.sh --test --full
 ```
 
-### Integración Continua (CI/CD)
-El repositorio cuenta con un workflow de GitHub Actions que ejecuta de forma automatizada la batería de pruebas en cada `push` y `pull_request` hacia las ramas principales.
-
-**Nota Importante sobre Tests y Secretos**:
-El pipeline de integración continua actual *depende de que todos los tests permanezcan mockeados* (empleando librerías como `respx` o `unittest.mock`). Cualquier test futuro que requiera credenciales reales contra servicios externos (ej. operaciones directas contra el GitLab institucional de la UGR cuando haya acceso, o llamadas no-mockeadas a la API de GitHub) debe ser **excluido explícitamente** de la ejecución en CI, o alternativamente deberá gestionarse configurando esos secretos en GitHub Secrets. No asumas que un test dependiente de estado o credenciales externas reales seguirá funcionando sin cambios en el entorno de CI.
-
 ### Comandos de Operación
 | Comando | Acción |
 |---|---|
