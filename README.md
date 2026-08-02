@@ -1,5 +1,6 @@
 # LLM Wiki Assistant
 
+[![CI Tests](https://github.com/julia8873/llm-wiki-assistant/actions/workflows/tests.yml/badge.svg)](https://github.com/julia8873/llm-wiki-assistant/actions/workflows/tests.yml)
 [![Fase Actual](https://img.shields.io/badge/Estado-Fase_7_Completada-success.svg)](docs/index.md)
 [![Doxygen](https://img.shields.io/badge/Docs-Doxygen-blue.svg)](Doxyfile)
 [![LLM Multi-Provider](https://img.shields.io/badge/LLM-OpenAI_|_Gemini_|_Ollama-blue.svg)](config/config.yaml)

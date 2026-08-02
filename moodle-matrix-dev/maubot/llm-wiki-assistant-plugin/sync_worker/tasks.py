@@ -7,14 +7,37 @@ import asyncio
 import logging
 import httpx
 from git_utils import asegurar_repo_local, run_git_command, asegurar_estructura_okf, distributed_repo_lock
+from github_client import GitHubRateLimitError
 
 logger = logging.getLogger(__name__)
+
+def _handle_task_exception(e: Exception, func, *args, **kwargs):
+    if isinstance(e, GitHubRateLimitError):
+        from rq import get_current_job
+        from datetime import timedelta
+        job = get_current_job()
+        if job:
+            retries = job.meta.get('rate_limit_retries', 0)
+            # Conservador exponencial con tope de 1 hora
+            backoff_delay = min(60 * (2 ** retries), 3600)
+            delay = max(e.retry_after_seconds, backoff_delay)
+            
+            job.meta['rate_limit_retries'] = retries + 1
+            job.save_meta()
+            
+            logger.warning(f"Rate limit detectado. Reencolando {func.__name__} en {delay}s (intento {retries+1})")
+            job.queue.enqueue_in(timedelta(seconds=delay), func, *args, **kwargs)
+            return
+    raise e
 
 def sync_repo_task(matrix_room_id: str, repo_alumno_url: str, official_repo_url: str):
     """!
     @brief Tarea síncrona que envuelve el loop asíncrono para ejecutar el job de sync.
     """
-    asyncio.run(_async_sync_repo_task(matrix_room_id, repo_alumno_url, official_repo_url))
+    try:
+        asyncio.run(_async_sync_repo_task(matrix_room_id, repo_alumno_url, official_repo_url))
+    except Exception as e:
+        _handle_task_exception(e, sync_repo_task, matrix_room_id, repo_alumno_url, official_repo_url)
 
 async def _async_sync_repo_task(matrix_room_id: str, repo_alumno_url: str, official_repo_url: str):
     import urllib.parse
@@ -105,7 +128,10 @@ def init_teacher_repo_task(matrix_room_id: str, official_repo_url: str, moodle_u
     """!
     @brief Tarea síncrona que envuelve el loop asíncrono para inicializar la carpeta del profesor.
     """
-    asyncio.run(_async_init_teacher_repo_task(matrix_room_id, official_repo_url, moodle_username))
+    try:
+        asyncio.run(_async_init_teacher_repo_task(matrix_room_id, official_repo_url, moodle_username))
+    except Exception as e:
+        _handle_task_exception(e, init_teacher_repo_task, matrix_room_id, official_repo_url, moodle_username)
 
 async def _async_init_teacher_repo_task(matrix_room_id: str, official_repo_url: str, moodle_username: str):
     import urllib.parse
@@ -160,7 +186,10 @@ def log_interaction_task(matrix_room_id: str, repo_alumno_url: str, official_rep
     """!
     @brief Tarea síncrona que envuelve el loop asíncrono para registrar una interacción RAG.
     """
-    asyncio.run(_async_log_interaction_task(matrix_room_id, repo_alumno_url, official_repo_url, log_data))
+    try:
+        asyncio.run(_async_log_interaction_task(matrix_room_id, repo_alumno_url, official_repo_url, log_data))
+    except Exception as e:
+        _handle_task_exception(e, log_interaction_task, matrix_room_id, repo_alumno_url, official_repo_url, log_data)
 
 async def _async_log_interaction_task(matrix_room_id: str, repo_alumno_url: str, official_repo_url: str, log_data: dict):
     import urllib.parse

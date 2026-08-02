@@ -330,3 +330,16 @@ Esta fase abordó el riesgo crítico de pérdida de datos en producción introdu
   - Se eliminaron por completo y deliberadamente los volúmenes `postgres_api_data` y `redis_data` simulando un fallo catastrófico.
   - Se restauró PostgreSQL (`pg_restore -c`) y el directorio `appendonlydir` de Redis desde el último `tar.gz` generado por el cron.
   - La verificación posterior demostró la integridad total de los datos restaurados.
+
+---
+
+## Fase 9.3: Hardening de Producción (Rate Limiting y Sincronización Masiva)
+Esta fase incorporó resiliencia frente a cuellos de botella en la comunicación con APIs externas (GitHub/GitLab) al procesar creaciones masivas o sincronizaciones simultáneas de muchos alumnos.
+
+### Desarrollo e Implementación
+- **Detección Precisa en `mapeo-api` (HTTP)**: Se unificó la captura de errores 403/429 en `github_provider.py` y `gitlab_provider.py`. Usando las cabeceras HTTP reales (`Retry-After` o `X-RateLimit-Reset`), la API puede propagar el tiempo exacto de espera de la plataforma.
+- **Detección de Mejor Esfuerzo en Sync Worker (Git CLI)**: Debido a que las operaciones HTTPS nativas de `git` descartan las cabeceras HTTP, se implementó en `tasks.py` y `git_utils.py` una detección basada en el `stderr` del comando binario. Ante bloqueos secundarios (ej. *abuse detection*), se usa un esquema de backoff exponencial conservador, complementado por comprobaciones oportunistas al endpoint `/rate_limit` de GitHub.
+- **Reencolado Dinámico**: La captura de `GitHubRateLimitError` dentro del worker invoca dinámicamente a `enqueue_in` de RQ, reencolando las tareas fallidas (creación de repositorios del profesor, sincronización de alumnos, logging de interacciones) para que se retomen automáticamente una vez el bloqueo se haya mitigado, sin que se pierdan jobs.
+
+### Pruebas Realizadas
+- **Tests Automatizados de Backoff**: Se añadieron suites de prueba mockeadas (`test_rate_limiting.py`) para verificar que el reencolado respeta los incrementos exponenciales y procesa correctamente los *timestamps* de limitación primaria cuando están disponibles.

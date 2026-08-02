@@ -39,17 +39,18 @@ async def test_idempotent_log_interaction(tmp_path):
     with patch("sync_worker.tasks.distributed_repo_lock") as mock_lock, \
          patch("sync_worker.tasks.asegurar_repo_local") as mock_asegurar, \
          patch("sync_worker.tasks.run_git_command") as mock_git, \
-         patch("sync_worker.tasks.urllib.parse.quote_plus", return_value="fake_repo"):
+         patch("urllib.parse.quote_plus", return_value="fake_repo"):
         
-        # Override repo local dest
-        with patch("os.path.join") as mock_join:
-            # We mock run_git_command to return success
-            mock_git.return_value = (0, "ok", "")
-            
-            # Run task
-            await _async_log_interaction_task(matrix_room_id, repo_alumno_url, official_repo_url, log_data)
-            
-            # Since the file didn't exist, it should have been written.
-            # run_git_command should be called 3 times (add, commit, push)
-            assert mock_git.call_count == 3
+        # Clean up state to prevent bleeding between tests
+        import shutil
+        shutil.rmtree("/tmp/llm_wiki_repos/fake_repo", ignore_errors=True)
 
+        # We mock run_git_command to return success
+        mock_git.return_value = (0, "ok", "")
+
+        # Run task
+        await _async_log_interaction_task(matrix_room_id, repo_alumno_url, official_repo_url, log_data)
+            
+        # Since the file didn't exist, it should have been written.
+        # run_git_command should be called 3 times (add, commit, push)
+        assert mock_git.call_count == 3

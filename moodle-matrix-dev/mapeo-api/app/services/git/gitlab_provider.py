@@ -1,7 +1,7 @@
 import os
 import httpx
 import logging
-from .base import GitProviderClient
+from .base import GitProviderClient, GitLabRateLimitError
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -32,11 +32,24 @@ class GitLabProvider(GitProviderClient):
     async def _get_client(self) -> httpx.AsyncClient:
         return httpx.AsyncClient(base_url=self.api_base, headers=self.headers)
 
+    def _check_response(self, res: httpx.Response):
+        if res.status_code == 429:
+            retry_after = res.headers.get("Retry-After")
+            if retry_after and retry_after.isdigit():
+                raise GitLabRateLimitError("GitLab rate limit exceeded", int(retry_after))
+            
+            reset_time = res.headers.get("RateLimit-Reset")
+            if reset_time and reset_time.isdigit():
+                import time
+                wait_seconds = max(int(reset_time) - int(time.time()), 0)
+                raise GitLabRateLimitError("GitLab rate limit exceeded", wait_seconds)
+
     async def existe_repo(self, repo_url_or_name: str) -> bool:
         repo_name = repo_url_or_name.split('/')[-1].replace('.git', '')
         project_path = f"{self.org}/{repo_name}".replace("/", "%2F")
         async with await self._get_client() as client:
             res = await client.get(f"/projects/{project_path}")
+            self._check_response(res)
             return res.status_code == 200
 
     async def crear_repo_oficial(self, nombre_asignatura: str, template_id: str = None) -> str:
@@ -62,6 +75,7 @@ class GitLabProvider(GitProviderClient):
                     "visibility": "private"
                 }
             )
+            self._check_response(res)
             
             if res.status_code in (201, 200):
                 repo_data = res.json()
@@ -70,6 +84,7 @@ class GitLabProvider(GitProviderClient):
                 # Eliminar relación de fork
                 logger.info(f"Eliminando relación de fork para {repo_oficial}...")
                 del_res = await client.delete(f"/projects/{project_id}/fork")
+                self._check_response(del_res)
                 if del_res.status_code != 204:
                     logger.warning(f"No se pudo eliminar el fork link de {repo_oficial}")
                     
@@ -103,6 +118,7 @@ class GitLabProvider(GitProviderClient):
                     "visibility": "private"
                 }
             )
+            self._check_response(res)
             
             if res.status_code in (201, 200):
                 repo_data = res.json()
@@ -110,6 +126,7 @@ class GitLabProvider(GitProviderClient):
                 
                 logger.info(f"Eliminando relación de fork para {nombre_repo}...")
                 del_res = await client.delete(f"/projects/{project_id}/fork")
+                self._check_response(del_res)
                 if del_res.status_code != 204:
                     logger.warning(f"No se pudo eliminar el fork link de {nombre_repo}")
                     

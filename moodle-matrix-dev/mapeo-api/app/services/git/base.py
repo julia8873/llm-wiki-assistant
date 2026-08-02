@@ -1,5 +1,24 @@
 from abc import ABC, abstractmethod
 
+class GitRateLimitError(Exception):
+    """!
+    @brief Excepción base para errores de Rate Limit en proveedores Git.
+    """
+    def __init__(self, message: str, retry_after_seconds: int):
+        super().__init__(message)
+        self.retry_after_seconds = retry_after_seconds
+
+class GitHubRateLimitError(GitRateLimitError):
+    """!
+    @brief Error específico de Rate Limit para GitHub.
+    """
+    pass
+
+class GitLabRateLimitError(GitRateLimitError):
+    """!
+    @brief Error específico de Rate Limit para GitLab.
+    """
+    pass
 class GitProviderClient(ABC):
     """!
     @brief Interfaz base para los clientes de proveedores Git.

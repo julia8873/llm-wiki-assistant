@@ -8,6 +8,7 @@ import logging
 from typing import Optional, Tuple
 import redis.asyncio as redis
 from contextlib import asynccontextmanager
+from github_client import GitHubRateLimitError, get_opportunistic_reset_time
 
 logger = logging.getLogger(__name__)
 
@@ -77,14 +78,29 @@ async def run_git_command(*args, cwd=None):
     """!
     @brief Ejecuta un comando git de forma asíncrona.
     """
+    env = os.environ.copy()
+    env["LC_ALL"] = "C"
+    
     process = await asyncio.create_subprocess_exec(
         'git', *args,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
-        cwd=cwd
+        cwd=cwd,
+        env=env
     )
     stdout, stderr = await process.communicate()
-    return process.returncode, stdout.decode(), stderr.decode()
+    out = stdout.decode()
+    err = stderr.decode()
+    
+    # Detección de Rate Limit en el stderr del cliente git (que consume las cabeceras reales HTTP)
+    if process.returncode != 0 and ("429" in err or "rate limit" in err.lower() or "403" in err):
+        # Esfuerzo oportunista para intentar leer el límite primario desde la API real
+        reset_time = await get_opportunistic_reset_time()
+        # Si falló la comprobación o no estamos limitados por primary (ej. es el secondary abuse detect), usamos 60s
+        base_delay = reset_time if reset_time > 0 else 60
+        raise GitHubRateLimitError(f"Rate limit detectado vía git stderr: {err.strip()}", base_delay)
+        
+    return process.returncode, out, err
 
 async def asegurar_repo_local(repo_alumno_url: str, official_repo_url: Optional[str], destino_local: str) -> None:
     """!

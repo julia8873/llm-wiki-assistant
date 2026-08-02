@@ -1,7 +1,7 @@
 import os
 import httpx
 import logging
-from .base import GitProviderClient
+from .base import GitProviderClient, GitHubRateLimitError
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -31,10 +31,27 @@ class GitHubProvider(GitProviderClient):
     async def _get_client(self) -> httpx.AsyncClient:
         return httpx.AsyncClient(base_url=self.api_base, headers=self.headers)
 
+    def _check_response(self, res: httpx.Response):
+        if res.status_code in (403, 429):
+            # Check for secondary rate limit (Retry-After)
+            retry_after = res.headers.get("Retry-After")
+            if retry_after and retry_after.isdigit():
+                raise GitHubRateLimitError("GitHub secondary rate limit exceeded", int(retry_after))
+            
+            # Check for primary rate limit (X-RateLimit-Reset)
+            remaining = res.headers.get("X-RateLimit-Remaining")
+            if remaining == "0":
+                reset_time = res.headers.get("X-RateLimit-Reset")
+                if reset_time and reset_time.isdigit():
+                    import time
+                    wait_seconds = max(int(reset_time) - int(time.time()), 0)
+                    raise GitHubRateLimitError("GitHub primary rate limit exceeded", wait_seconds)
+
     async def existe_repo(self, repo_url_or_name: str) -> bool:
         repo_name = repo_url_or_name.split('/')[-1].replace('.git', '')
         async with await self._get_client() as client:
             res = await client.get(f"/repos/{self.org}/{repo_name}")
+            self._check_response(res)
             return res.status_code == 200
 
     async def crear_repo_oficial(self, nombre_asignatura: str, template_id: str = None) -> str:
@@ -43,6 +60,7 @@ class GitHubProvider(GitProviderClient):
 
         async with await self._get_client() as client:
             check_res = await client.get(f"/repos/{self.org}/{repo_oficial}")
+            self._check_response(check_res)
             if check_res.status_code == 200:
                 logger.info(f"El repositorio oficial {self.org}/{repo_oficial} ya existe.")
                 return check_res.json().get("clone_url", f"https://github.com/{self.org}/{repo_oficial}.git")
@@ -59,6 +77,7 @@ class GitHubProvider(GitProviderClient):
                     "include_all_branches": False
                 }
             )
+            self._check_response(gen_res)
             
             if gen_res.status_code in (201, 200, 422):
                 repo_data = gen_res.json()
@@ -101,6 +120,7 @@ class GitHubProvider(GitProviderClient):
                     }
                 }
             )
+            self._check_response(res)
             if res.status_code not in (200, 201):
                 logger.warning(f"Failed to register webhook for {repo_name}: HTTP {res.status_code} {res.text}")
             else:
@@ -110,6 +130,7 @@ class GitHubProvider(GitProviderClient):
         repo_name = repo_url.split('/')[-1].replace('.git', '')
         async with await self._get_client() as client:
             res = await client.patch(f"/repos/{self.org}/{repo_name}", json={"is_template": True})
+            self._check_response(res)
             if res.status_code != 200:
                 logger.warning(f"No se pudo marcar {repo_name} como template (HTTP {res.status_code})")
 
@@ -120,6 +141,7 @@ class GitHubProvider(GitProviderClient):
         
         async with await self._get_client() as client:
             check_res = await client.get(f"/repos/{self.org}/{nombre_repo}")
+            self._check_response(check_res)
             if check_res.status_code == 200:
                 logger.info(f"El repositorio {self.org}/{nombre_repo} ya existe.")
                 return check_res.json().get("clone_url", f"https://github.com/{self.org}/{nombre_repo}.git")
@@ -136,6 +158,7 @@ class GitHubProvider(GitProviderClient):
                     "include_all_branches": False
                 }
             )
+            self._check_response(gen_res)
             
             if gen_res.status_code in (201, 200):
                 return gen_res.json().get("clone_url", f"https://github.com/{self.org}/{nombre_repo}.git")
