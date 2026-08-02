@@ -14,10 +14,14 @@ Flujo de ejecución:
 3. Levanta el servidor de documentación Doxygen en modo *detached* (segundo plano).
 4. Compila y empaqueta automáticamente el plugin del bot de Matrix en formato `.mbp` (Fase 5).
 
-### Levantar la Infraestructura (Fase 1)
+### Levantar la Infraestructura (Fase 1 y 9.1)
 Para levantar el stack tecnológico de contenedores, utiliza el comando `up`:
 ```bash
-./instalar.sh up [--ollama]
+# Para producción (Por defecto, usa PostgreSQL. Requiere DATABASE_URL válida)
+./instalar.sh up --env=production
+
+# Para desarrollo local (Utiliza SQLite como base de datos)
+./instalar.sh up --env=dev
 ```
 Flujo de ejecución interno:
 1. **Autogeneración del Entorno**: El orquestador extrae dinámicamente puertos y nombres de contenedores desde `config/config.yaml` y los fusiona junto a tus secretos (`moodle-matrix-dev/.env.example`) dentro del archivo `moodle-matrix-dev/.env`.

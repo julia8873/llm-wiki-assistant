@@ -198,6 +198,8 @@ Esta fase representa el núcleo de la Inteligencia Artificial del proyecto. Se d
     - `recursos/`: Resumen fuente del documento (`type: Source`).
     - `conceptos/`: Ficheros aislados de teoría (`type: Concept`).
     - `entidades/`: Menciones a personas, herramientas o productos (`type: Entity`).
+
+
   - **Inyección YAML**: Todos los archivos generados incluyen forzosamente su cabecera YAML Frontmatter exigida por el estándar OKF.
   - **Git Automation**: El bot hace un `git add .`, commit y push directo de los resultados de vuelta al fork de GitHub del estudiante, todo en segundo plano.
 - **Comandos de Chat Interactivos (`assistant.py`)**:
@@ -277,3 +279,54 @@ El objetivo principal de esta fase fue unificar las distintas suites de pruebas 
 - **Exclusiones Conscientes**:
   - Scripts interactivos o sin código de salida fiable (como `test_race.py`) y comprobaciones que fuerzan reinicios abruptos (`hot-reload`) se mantienen exclusivamente para comprobaciones manuales, garantizando la fiabilidad de CI/CD para el resto del sistema.
   - La idempotencia profunda (e.g. clonado resiliente de GitLab) queda registrada y documentada como deuda técnica menor.
+
+---
+
+## Fase 8: Actualización y Reestructuración de Documentación
+
+### Resumen de la Fase
+Se llevó a cabo una revisión integral y actualización de la documentación técnica para alinearla con los desarrollos recientes de las Fases 5.1, 6 y 7. El objetivo fue consolidar las explicaciones arquitectónicas, de seguridad y los flujos de integración.
+
+### Cambios Técnicos
+- **Reestructuración de Nomenclatura**: Se renombró el documento `mapeo-alumno-template.md` a `mapeo-alumno-repositorio.md` para reflejar con mayor precisión el modelo actual de "Alumno-Repositorio-Sala", detallando la justificación de usar "Generate from Template" en lugar de "Fork".
+- **Actualización de Arquitectura e Interfaces**: Se actualizaron `README.md`, `arquitectura.md` y `bot.md` para incorporar los nuevos flujos asíncronos, la orquestación de colas, y la infraestructura de workers.
+- **Documentación de API y Seguridad**:
+  - `api-mapeo.md` actualizado para detallar las nuevas estructuras y parámetros.
+  - `seguridad.md` ampliado para detallar el manejo de tokens dinámicos por proveedor Git (`GITHUB_PAT`, `GITLAB_TOKEN`, `GIT_SELF_HOSTED_TOKEN`), claves de LLMs (`OPENAI_API_KEY`, `GEMINI_API_KEY`) y los secretos entre subsistemas (como `GITHUB_WEBHOOK_SECRET` para proteger la cola asíncrona mediante HMAC).
+
+---
+
+## Fase 9.1: Hardening de Producción (Migración a PostgreSQL)
+Esta fase inició el proceso de estabilización del entorno para cargas concurrentes reales de producción, abordando específicamente el cuello de botella de escritura concurrente en la API central (anteriormente en SQLite).
+
+### Desarrollo e Implementación
+- **Motor de Base de Datos Obligatorio**: Se introdujo PostgreSQL (`postgres:16-alpine`) en `docker-compose.yml` como la base de datos exclusiva para producción en `mapeo-api`.
+- **Fail-Fast en Orquestador**: Se dotó a `instalar.sh` de los flags `--env=production` y `--env=dev`. El modo de producción valida estrictamente la existencia de una variable `DATABASE_URL` válida; de no encontrarla, detiene el arranque de forma preventiva para evitar arrancar con SQLite en entornos sensibles.
+- **Parametrización Híbrida Segura (`db.py`)**: Se abstrajo la lógica de conexión para que los parámetros inseguros (`check_same_thread=False`) se apliquen exclusivamente cuando se detecta el dialecto `sqlite` (usado solo bajo `--env=dev`), protegiendo la conexión PostgreSQL.
+
+### Pruebas Realizadas
+- **Validación de Migraciones (Alembic)**: Se validó que el esquema generado (Fase 4.2) es verdaderamente agnóstico. Se comprobó la ejecución `alembic upgrade head` contra una base de datos PostgreSQL en blanco, generando las tablas sin conflictos.
+- **Prueba de Carga / Concurrencia Simultánea**:
+  - Se desarrolló `test_concurrencia.py` para inyectar 60 peticiones `POST /mapeos/` simultáneas.
+  - Al ejecutarlo sobre SQLite, el motor colapsó según lo esperado devolviendo errores HTTP 500 (`database is locked`).
+  - Al ejecutarlo sobre PostgreSQL, completó el 100% de las escrituras de forma atómica sin ningún error de concurrencia.
+
+---
+
+## Fase 9.2: Hardening de Producción (Backup Automatizado)
+Esta fase abordó el riesgo crítico de pérdida de datos en producción introduciendo un sistema de copias de seguridad automatizado y validando exhaustivamente el proceso de recuperación ante desastres.
+
+### Desarrollo e Implementación
+- **Automatización de Backups (`backup.sh` y Cron)**: Se introdujo un nuevo contenedor de `backup` (Alpine Linux con `crond`, `postgresql16-client` y `redis`) que ejecuta un script diariamente a las 03:00 am.
+- **Estrategia Dual de Respaldo**:
+  - PostgreSQL: Dumps generados mediante `pg_dump -Fc`.
+  - Redis: En lugar de usar instantáneas RDB, el script empaqueta (con `tar`) de forma segura el directorio real `appendonlydir` montado en solo lectura, lo que garantiza 0 pérdida de trabajos encolados y preserva el diseño de durabilidad AOF de la Fase 6.
+- **Política de Retención Local**: El script limpia automáticamente backups antiguos reteniendo los últimos 7 días y un backup semanal de las últimas 4 semanas.
+- **Seguridad y Aislamiento**: Los respaldos se generan de forma no intrusiva mediante *bind mounts* en el host físico (`/backups`) y el contenedor de backup interactúa con los volúmenes de producción solo en modo `ro` (read-only).
+
+### Pruebas Realizadas
+- **Prueba de Recuperación ante Desastres (Disaster Recovery Test)**:
+  - Se pobló de datos reales una instancia en producción (datos en PostgreSQL y trabajos RQ en Redis AOF).
+  - Se eliminaron por completo y deliberadamente los volúmenes `postgres_api_data` y `redis_data` simulando un fallo catastrófico.
+  - Se restauró PostgreSQL (`pg_restore -c`) y el directorio `appendonlydir` de Redis desde el último `tar.gz` generado por el cron.
+  - La verificación posterior demostró la integridad total de los datos restaurados.

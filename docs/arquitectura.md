@@ -24,10 +24,12 @@ flowchart TD
     %% Sistemas Principales
     Moodle[Moodle Block BDC]
     MapeoAPI[Mapeo API]
-    MariaDB[(MariaDB)]
+    MariaDB[(MariaDB - Moodle)]
+    Postgres[(PostgreSQL - MapeoAPI)]
     Matrix[Matrix Synapse]
     Maubot[Maubot LLM Bot]
     Redis[(Redis)]
+    Backup[Backup Service]
 
     %% Workers
     SyncWorker1[Sync Worker 1]
@@ -56,7 +58,7 @@ flowchart TD
     MapeoAPI -->|Usa configuración Git| Factory
     Factory -->|Aprovisiona repositorio| RepoAlumno
     RepoOficial -.->|Template| RepoAlumno
-    MapeoAPI -->|Persiste Mapeo| MariaDB
+    MapeoAPI -->|Persiste Mapeo| Postgres
     MapeoAPI -->|Crea sala e invita bot| Matrix
 
     %% Flujo 2: Chat en vivo
@@ -77,6 +79,10 @@ flowchart TD
     Redis -->|Consume log-jobs| SyncWorker2
     SyncWorker1 -.->|Lock distribuido Redis\nGit Push| RepoAlumno
     SyncWorker2 -.->|Lock distribuido Redis\nGit Push| RepoAlumno
+
+    %% Flujo 5: Copias de Seguridad (Fase 9.2)
+    Backup -->|Dump diario pg_dump| Postgres
+    Backup -->|Snapshot AOF (tar)| Redis
 ```
 
 ## Mapa de Servicios (Puertos)
@@ -87,13 +93,15 @@ Las credenciales reales dependerán del proveedor que tengas activo (por ejemplo
 |---|---|---|---|---|
 | **Moodle** | 8080 | 8000 | `MOODLE_USERNAME` / `MOODLE_PASSWORD` | Usa credenciales definidas en `.env` al levantarse. |
 | **Mapeo API** | 8000 | (Interno) | `MAPEO_API_TOKEN` | Generado automáticamente. |
-| **MariaDB** | 3306 | 3306 | `MARIADB_USER` / `MARIADB_PASSWORD` | DB central para la API. |
+| **MariaDB** | 3306 | 3306 | `MARIADB_USER` / `MARIADB_PASSWORD` | DB de Moodle. |
+| **PostgreSQL** | 5432 | (Interno) | `POSTGRES_USER` / `POSTGRES_PASSWORD` | DB de producción para Mapeo API. |
 | **Synapse** | 8008 | 8008 | `MATRIX_ACCESS_TOKEN` | Token admin. |
 | **Element Web** | 80 | 8081 | - | Cliente web de Matrix en http://localhost:8081 |
 | **Maubot** | 29317 | 29317 | `MATRIX_BOT_USER` | Backend de ejecución del LLM Bot. |
 | **Doxygen** | 8000 | 8005 | - | Servidor de documentación en http://localhost:8005 |
 | **Redis** | 6379 | 6379 | - | Broker de trabajos (sync y logs). |
 | **Sync Worker 1 / 2** | N/A | N/A | - | Workers consumiendo RQ `sync-jobs` y `log-jobs`. |
+| **Backup** | N/A | N/A | - | Cron para dumps diarios (Fase 9.2). |
 | **GitHub** (Activo por defecto) | N/A | N/A | `GITHUB_PAT` | El `pat_env_var` configurado en `config.yaml`. |
 | **GitLab** | N/A | N/A | `GITLAB_TOKEN` (ejemplo) | Se usaría si `git.proveedor_activo` = `gitlab`. |
 | **Ollama** | 11434 | 11434 | `OLLAMA_API_KEY_DUMMY` | **Opcional**, requiere `./instalar.sh up --ollama`. |

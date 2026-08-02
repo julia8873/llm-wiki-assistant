@@ -266,22 +266,42 @@ print_summary() {
 ## @brief Levanta la infraestructura de Fase 1
 cmd_up() {
   local use_ollama=false
+  local env_mode="production"
   for arg in "$@"; do
     if [[ "$arg" == "--ollama" ]]; then
       use_ollama=true
+    fi
+    if [[ "$arg" == "--env=dev" ]]; then
+      env_mode="dev"
+    fi
+    if [[ "$arg" == "--env=production" ]]; then
+      env_mode="production"
     fi
   done
   
   generate_env
   
-  info "Levantando servicios Docker Compose..."
+  if [[ "$env_mode" == "production" ]]; then
+    # Fail fast si no hay DATABASE_URL o no es postgres
+    local db_url=$(grep -E "^DATABASE_URL=" "${ROOT_DIR}/moodle-matrix-dev/.env" | cut -d= -f2- || true)
+    if [[ -z "$db_url" || ! "$db_url" =~ ^postgresql ]]; then
+      error "En modo production, DATABASE_URL debe estar configurado y apuntar a PostgreSQL. Para usar SQLite en desarrollo local, ejecuta con '--env=dev'."
+    fi
+  fi
+
+  info "Levantando servicios Docker Compose (Modo: ${env_mode})..."
   cd "${ROOT_DIR}/moodle-matrix-dev"
   
+  local compose_args="-f docker-compose.yml"
+  if [[ "$env_mode" == "dev" ]]; then
+    compose_args="-f docker-compose.yml -f docker-compose.dev.yml"
+  fi
+
   if [ "$use_ollama" = true ]; then
     info "Perfil Ollama activado."
-    docker compose --env-file .env --profile ollama up -d --build
+    docker compose $compose_args --env-file .env --profile ollama up -d --build
   else
-    docker compose --env-file .env up -d --build
+    docker compose $compose_args --env-file .env up -d --build
   fi
   
   info "Esperando a que Moodle y mapeo-api estén operativos (Healthchecks)..."
