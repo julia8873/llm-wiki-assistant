@@ -2,7 +2,7 @@ name: CI Tests
 
 on:
   push:
-    branches: [ "main", "master", "develop" ]
+    branches: [ "main", "master", "develop", "ci-test-failure", "ci-test-success" ]
   pull_request:
     branches: [ "main", "master", "develop" ]
 
