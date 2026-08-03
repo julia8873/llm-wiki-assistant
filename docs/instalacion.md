@@ -1,5 +1,30 @@
 # Despliegue y Operación
 
+## Configuración Inicial Requerida
+Antes de levantar el proyecto, debes configurar las credenciales y parámetros de los servicios externos. Estas configuraciones se dividen en dos archivos principales:
+
+### 1. Variables de Entorno (`moodle-matrix-dev/.env`)
+Copia el archivo `moodle-matrix-dev/.env.example` a `moodle-matrix-dev/.env` y completa los siguientes valores esenciales:
+- **Claves de LLM (Configura solo la del proveedor que vayas a usar):**
+  - `OPENAI_API_KEY`: Requerida si usas OpenAI. Consíguela en el panel de [OpenAI API Keys](https://platform.openai.com/api-keys).
+  - `GEMINI_API_KEY`: Requerida si usas Google Gemini. Consíguela en [Google AI Studio](https://aistudio.google.com/app/apikey).
+  - *(Nota: Si usas Ollama de forma local, no necesitas API Key, pero debes activarlo en `config.yaml`)*.
+- **Credenciales de Matrix:**
+  - `MATRIX_ACCESS_TOKEN`: Token de administrador necesario para crear salas y usuarios automáticamente.
+    - *Cómo obtenerlo:* Una vez levantado Synapse/Element (Fase 1), inicia sesión en tu cliente Element con la cuenta de administrador. Ve a **Ajustes -> Ayuda e información -> Avanzado -> Token de acceso** y cópialo aquí.
+- **Tokens Internos Seguros:**
+  - `MAPEO_API_TOKEN`: Si lo dejas como `changeme`, el script de instalación (`instalar.sh`) inyectará automáticamente un token seguro generado criptográficamente al vuelo.
+
+### 2. Configuración Global (`config/config.yaml`)
+Copia el archivo `config/config.yaml.example` a `config/config.yaml` y revisa los siguientes bloques obligatorios:
+- **Configuración del Repositorio (Git):**
+  - `git.proveedor_activo`: Elige entre `github`, `gitlab` o `self_hosted`.
+  - `git.organizacion`: Tu nombre de usuario o nombre de la organización donde se crearán los repositorios.
+  - `git.github.pat`: Tu Personal Access Token (PAT) de GitHub (si usas GitHub).
+    - *Cómo obtenerlo:* Ve a [GitHub Developer Settings](https://github.com/settings/tokens). Genera un token (Classic) y asegúrate de marcar al menos el scope completo de `repo`.
+- **Selección del Motor LLM:**
+  - `llm.proveedor_activo`: Indica el motor de IA que usarás por defecto (`openai`, `gemini`, `ollama`).
+
 ## Script Orquestador: `instalar.sh`
 Único punto de entrada para operaciones de infraestructura. 
 

@@ -106,6 +106,56 @@ EOF
   exit 0
 }
 
+## @fn warn_pending_config()
+## @brief Informa al usuario de que debe rellenar las variables de entorno pendientes.
+## @details Se llama al final de la instalación, después de que los contenedores estén operativos.
+## El MATRIX_ACCESS_TOKEN sólo puede obtenerse tras levantar Element/Synapse (Fase 1).
+warn_pending_config() {
+  local env_file="${ROOT_DIR}/.env"
+  local cfg_file="${ROOT_DIR}/config/config.yaml"
+  local has_pending=false
+
+  if grep -q "CHANGE_ME" "$env_file" 2>/dev/null; then has_pending=true; fi
+  if grep -q "CHANGE_ME" "$cfg_file" 2>/dev/null; then has_pending=true; fi
+
+  if [[ "$has_pending" == true ]]; then
+    echo ""
+    echo "⚠️  ACCIÓN REQUERIDA: INTRODUCE TUS CREDENCIALES"
+    echo "--------------------------------------------------------------------"
+    echo "  Los contenedores están operativos."
+    echo "  Los siguientes campos aún tienen el valor CHANGE_ME y deben ser"
+    echo "  configurados antes de que el sistema funcione correctamente:"
+    echo ""
+
+    if grep -q "CHANGE_ME" "$env_file" 2>/dev/null; then
+      echo "  📄 .env"
+      grep "CHANGE_ME" "$env_file" | sed 's/=.*//' | while read -r var; do
+        echo "      → $var"
+      done
+      echo ""
+    fi
+
+    if grep -q "CHANGE_ME" "$cfg_file" 2>/dev/null; then
+      echo "  📄 config/config.yaml"
+      grep "CHANGE_ME" "$cfg_file" | grep -v "^[[:space:]]*#" | sed 's/:.*$//' | sed 's/^[[:space:]]*//' | while read -r key; do
+        echo "      → $key"
+      done
+      echo ""
+    fi
+
+    echo "  MATRIX_ACCESS_TOKEN — cómo obtenerlo (requiere Element operativo):"
+    echo "      1. Abre http://localhost:8081 (Element)"
+    echo "      2. Inicia sesión como administrador"
+    echo "      3. Ajustes → Ayuda e información → Avanzado → Token de acceso"
+    echo "      4. Pégalo en .env como:  MATRIX_ACCESS_TOKEN=syt_..."
+    echo ""
+    echo "  Cuando hayas rellenado los archivos, ejecuta de nuevo:"
+    echo "      ./instalar.sh up"
+    echo "--------------------------------------------------------------------"
+    echo ""
+  fi
+}
+
 ## @fn cmd_install_all()
 ## @brief Flujo principal de instalación que se ejecuta por defecto sin argumentos.
 ## 
@@ -142,6 +192,7 @@ cmd_install_all() {
   echo "  [OK] Lanzando servidor Doxygen silencioso"
   echo ""
   cmd_docs serve
+  warn_pending_config
 }
 
 ## @fn cmd_docs()
@@ -225,6 +276,32 @@ generate_env() {
   
   # Eliminar retornos de carro (CRLF -> LF) para evitar errores "command not found" al hacer source en WSL
   sed -i 's/\r$//' "$env_file"
+
+  # Propagar variables del .env raíz hacia moodle-matrix-dev/.env
+  # Solo se propagan si el valor en el raíz NO es un placeholder CHANGE_ME y la variable existe en el .env destino.
+  info "Propagando variables de ${ROOT_DIR}/.env hacia ${env_file}..."
+  local root_env="${ROOT_DIR}/.env"
+  local vars_to_propagate=(
+    MATRIX_ACCESS_TOKEN
+    OPENAI_API_KEY
+    OPENAI_BASE_URL
+    OPENAI_MODEL
+    GEMINI_API_KEY
+    MAUBOT_ADMIN_PASSWORD
+    MAUBOT_CRYPTO_PICKLE_KEY
+  )
+  for var in "${vars_to_propagate[@]}"; do
+    local val
+    val=$(grep -m 1 "^${var}=" "$root_env" 2>/dev/null | cut -d= -f2-)
+    if [[ -n "$val" && "$val" != *"CHANGE_ME"* ]]; then
+      # Reemplazar o añadir la variable en el .env destino
+      if grep -q "^${var}=" "$env_file"; then
+        sed -i "s|^${var}=.*|${var}=${val}|" "$env_file"
+      else
+        echo "${var}=${val}" >> "$env_file"
+      fi
+    fi
+  done
 }
 
 ## @fn print_summary()
@@ -261,6 +338,76 @@ print_summary() {
 # ------------------------------------------------------------------------------
 # Stubs de fases futuras
 # ------------------------------------------------------------------------------
+
+## @fn setup_synapse_admin()
+## @brief Registra y promueve al usuario administrador configurado en .env como admin de Synapse.
+## @details Se ejecuta tras el primer arranque de los contenedores para garantizar que el
+## MATRIX_ACCESS_TOKEN sea de un admin de Synapse y pueda crear usuarios/salas vía la Admin API.
+setup_synapse_admin() {
+  local synapse_url="http://localhost:8008"
+  local admin_user; admin_user=$(grep -m 1 '^SYNAPSE_ADMIN_USER=' "${ROOT_DIR}/.env" | cut -d= -f2- | tr -d '\r')
+  local admin_pass; admin_pass=$(grep -m 1 '^SYNAPSE_ADMIN_PASSWORD=' "${ROOT_DIR}/.env" | cut -d= -f2- | tr -d '\r' | sed 's/_CHANGE_ME.*//')
+  local token_in_env; token_in_env=$(grep -m 1 '^MATRIX_ACCESS_TOKEN=' "${ROOT_DIR}/.env" | cut -d= -f2- | tr -d '\r')
+
+  admin_user=${admin_user:-admin}
+  admin_pass=${admin_pass:-adminpass123}
+
+  info "Verificando que @${admin_user}:localhost sea admin de Synapse..."
+
+  # 1. Intentar login para obtener token fresco
+  local login_resp
+  login_resp=$(curl -sf -X POST "${synapse_url}/_matrix/client/v3/login" \
+    -H 'Content-Type: application/json' \
+    -d "{\"type\":\"m.login.password\",\"user\":\"${admin_user}\",\"password\":\"${admin_pass}\"}" 2>/dev/null || echo '')
+  local fresh_token; fresh_token=$(echo "$login_resp" | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4)
+
+  if [[ -z "$fresh_token" ]]; then
+    # Usuario no existe aún — registrarlo
+    info "Registrando usuario admin en Synapse..."
+    docker exec moodle-matrix-dev-synapse-1 \
+      register_new_matrix_user -c /data/homeserver.yaml --admin \
+      -u "$admin_user" -p "$admin_pass" http://localhost:8008 2>/dev/null || true
+    # Reintentar login
+    login_resp=$(curl -sf -X POST "${synapse_url}/_matrix/client/v3/login" \
+      -H 'Content-Type: application/json' \
+      -d "{\"type\":\"m.login.password\",\"user\":\"${admin_user}\",\"password\":\"${admin_pass}\"}" 2>/dev/null || echo '')
+    fresh_token=$(echo "$login_resp" | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4)
+  fi
+
+  if [[ -z "$fresh_token" ]]; then
+    warn "No se pudo obtener token de Synapse para @${admin_user}:localhost. Omitiendo promoción a admin."
+    return
+  fi
+
+  # 2. Comprobar si ya es admin
+  local user_info
+  user_info=$(curl -sf -H "Authorization: Bearer ${fresh_token}" \
+    "${synapse_url}/_synapse/admin/v2/users/@${admin_user}:localhost" 2>/dev/null || echo '')
+  local is_admin; is_admin=$(echo "$user_info" | grep -o '"admin":[^,}]*' | cut -d: -f2 | tr -d ' ')
+
+  if [[ "$is_admin" == "true" ]]; then
+    ok "@${admin_user}:localhost ya es admin de Synapse."
+  else
+    info "Promoviendo @${admin_user}:localhost a admin de Synapse..."
+    curl -sf -X PUT "${synapse_url}/_synapse/admin/v1/users/@${admin_user}:localhost/admin" \
+      -H "Authorization: Bearer ${fresh_token}" \
+      -H 'Content-Type: application/json' \
+      -d '{"admin":true}' > /dev/null
+    ok "@${admin_user}:localhost promovido a admin de Synapse."
+  fi
+
+  # 3. Si el token en .env es distinto al fresco (o no existía), actualizarlo
+  if [[ "$fresh_token" != "$token_in_env" && -n "$fresh_token" ]]; then
+    info "Actualizando MATRIX_ACCESS_TOKEN en .env con token fresco..."
+    local root_env="${ROOT_DIR}/.env"
+    local inner_env="${ROOT_DIR}/moodle-matrix-dev/.env"
+    sed -i "s|^MATRIX_ACCESS_TOKEN=.*|MATRIX_ACCESS_TOKEN=${fresh_token}|" "$root_env" 2>/dev/null || \
+      sed -i '' "s|^MATRIX_ACCESS_TOKEN=.*|MATRIX_ACCESS_TOKEN=${fresh_token}|" "$root_env"
+    sed -i "s|^MATRIX_ACCESS_TOKEN=.*|MATRIX_ACCESS_TOKEN=${fresh_token}|" "$inner_env" 2>/dev/null || \
+      sed -i '' "s|^MATRIX_ACCESS_TOKEN=.*|MATRIX_ACCESS_TOKEN=${fresh_token}|" "$inner_env"
+    ok "MATRIX_ACCESS_TOKEN actualizado en .env y moodle-matrix-dev/.env"
+  fi
+}
 
 ## @fn cmd_up()
 ## @brief Levanta la infraestructura de Fase 1
@@ -299,9 +446,9 @@ cmd_up() {
 
   if [ "$use_ollama" = true ]; then
     info "Perfil Ollama activado."
-    docker compose $compose_args --env-file .env --profile ollama up -d --build
+    docker compose $compose_args --env-file .env --profile ollama up -d --build --pull=missing
   else
-    docker compose $compose_args --env-file .env up -d --build
+    docker compose $compose_args --env-file .env up -d --build --pull=missing
   fi
   
   info "Esperando a que Moodle y mapeo-api estén operativos (Healthchecks)..."
@@ -329,6 +476,10 @@ EOF
         docker compose restart synapse
         ok "Synapse reiniciado con soporte SSO."
       fi
+
+      # Registrar y promover al admin de Synapse automáticamente
+      setup_synapse_admin
+
       break
     fi
     

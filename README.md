@@ -9,11 +9,21 @@ Sistema integrado de docencia Moodle-Matrix-Git. Proporciona a cada estudiante u
 
 *Toda la documentación técnica completa se genera vía Doxygen. Ejecuta `./instalar.sh docs serve` para acceder a ella en [http://localhost:8005](http://localhost:8005).*
 
-## Configuración Inicial Requerida
+## Tabla de Contenidos
+- [Configuración Inicial Requerida](#config_inicial)
+  - [1. Variables de Entorno (`moodle-matrix-dev/.env`)](#vars_entorno)
+  - [2. Configuración Global (`config/config.yaml`)](#config_global)
+- [Comandos Operativos Base (Desarrollo)](#comandos_base)
+- [Funcionalidades del Bot en Matrix (OKF v0.1)](#funcionalidades_bot)
+- [Credenciales de Prueba](#credenciales_prueba)
+- [Inventario de Componentes y Carpetas Clave](#inventario_componentes)
+- [Fases de Implementación y Estado](#fases_implementacion)
+
+## Configuración Inicial Requerida {#config_inicial}
 
 Antes de levantar el proyecto, debes configurar las credenciales y parámetros de los servicios externos. Estas configuraciones se dividen en dos archivos principales:
 
-### 1. Variables de Entorno (`moodle-matrix-dev/.env`)
+### 1. Variables de Entorno (`moodle-matrix-dev/.env`) {#vars_entorno}
 Copia el archivo `moodle-matrix-dev/.env.example` a `moodle-matrix-dev/.env` y completa los siguientes valores esenciales:
 
 - **Claves de LLM (Configura solo la del proveedor que vayas a usar):**
@@ -28,7 +38,7 @@ Copia el archivo `moodle-matrix-dev/.env.example` a `moodle-matrix-dev/.env` y c
 - **Tokens Internos Seguros:**
   - `MAPEO_API_TOKEN`: Si lo dejas como `changeme`, el script de instalación (`instalar.sh`) inyectará automáticamente un token seguro generado criptográficamente al vuelo.
 
-### 2. Configuración Global (`config/config.yaml`)
+### 2. Configuración Global (`config/config.yaml`) {#config_global}
 Copia el archivo `config/config.yaml.example` a `config/config.yaml` y revisa los siguientes bloques obligatorios:
 
 - **Configuración del Repositorio (Git):**
@@ -40,7 +50,7 @@ Copia el archivo `config/config.yaml.example` a `config/config.yaml` y revisa lo
 - **Selección del Motor LLM:**
   - `llm.proveedor_activo`: Indica el motor de IA que usarás por defecto (`openai`, `gemini`, `ollama`).
 
-## Comandos Operativos Base (Desarrollo)
+## Comandos Operativos Base (Desarrollo) {#comandos_base}
 
 Único punto de entrada: `instalar.sh`.
 
@@ -65,7 +75,7 @@ Copia el archivo `config/config.yaml.example` a `config/config.yaml` y revisa lo
 > [!WARNING]
 > **Aviso de Seguridad en Producción (Element Web)**: Durante la fase de desarrollo e integración, se han desactivado los avisos de cifrado de extremo a extremo (E2EE) y de copias de seguridad de claves (`UIFeature.keyBackup` y `UIFeature.crossSigning`) en `moodle-matrix-dev/element-config.json` para facilitar las pruebas del bot LLM sin fricción. Antes de desplegar el entorno en producción para la Universidad, se debe evaluar si se requiere E2EE estricto y, en tal caso, volver a activar estas variables.
 
-## Funcionalidades del Bot en Matrix (OKF v0.1)
+## Funcionalidades del Bot en Matrix (OKF v0.1) {#funcionalidades_bot}
 El Bot LLM implementa una ingesta automatizada siguiendo el estándar OKF v0.1 (`AGENTS.md`). Cuando se le envía un archivo, el bot genera una abstracción completa en el repositorio, creando:
 - **Conceptos**: Conceptos abstractos extraídos.
 - **Entidades**: Herramientas o personas mencionadas.
@@ -76,7 +86,7 @@ El Bot LLM implementa una ingesta automatizada siguiendo el estándar OKF v0.1 (
 - **`!deshacer`** o **`!revertir`**: Revierte la última ingesta automática en Git de manera segura.
 - **`!sincronizar`** o **`!sync`**: Fuerza la actualización de tu repositorio con el material del profesor.
 
-## Credenciales de Prueba
+## Credenciales de Prueba {#credenciales_prueba}
 
 Para probar el flujo de autenticación delegada (SSO) y la provisión de repositorios, se recomienda el uso de los siguientes usuarios de prueba (con los mismos datos de acceso en Moodle y Element):
 
@@ -89,7 +99,7 @@ Para probar el flujo de autenticación delegada (SSO) y la provisión de reposit
 
 > **Nota:** Se aconseja utilizar pestañas en modo incógnito al alternar entre `student1` y `student2` para evitar que Element re-cargue sesiones guardadas previas (localStorage) e impida el acceso cruzado.
 
-## Inventario de Componentes y Carpetas Clave
+## Inventario de Componentes y Carpetas Clave {#inventario_componentes}
 
 | Carpeta / Fichero | Descripción |
 |-------------------|-------------|
@@ -102,7 +112,7 @@ Para probar el flujo de autenticación delegada (SSO) y la provisión de reposit
 | `moodle-matrix-dev/maubot/llm-wiki-assistant-plugin/git_utils.py` | Módulo compartido de utilidades Git usado concurrentemente por Ingesta OKF, Sync, y Logging. Contiene el *Distributed Repo Lock*. |
 | `moodle-matrix-dev/moodle_plugins/block_bdc/` | Plugin de Moodle que intercepta el inicio de sesión y llama a `mapeo-api`. |
 
-## Fases de Implementación y Estado
+## Fases de Implementación y Estado {#fases_implementacion}
 - ✅ **Fase 0.1**: Documentación Doxygen y Configuración Base.
 - ✅ **Fase 1**: Infraestructura Docker Compose.
 - ✅ **Fase 2**: Almacén de Mapeos (FastAPI + SQLite).

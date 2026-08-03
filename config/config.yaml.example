@@ -1,6 +1,7 @@
 # ==============================================================================
 # PLANTILLA DE CONFIGURACIÓN CENTRAL (config.yaml.example)
-# Copiar a config/config.yaml y ajustar según el entorno local si es necesario.
+# Copia este fichero a config/config.yaml y ajusta los valores marcados
+# con CHANGE_ME antes de ejecutar ./instalar.sh
 # ==============================================================================
 servicios:
   moodle:
@@ -55,31 +56,43 @@ servicios:
     url_base: "http://localhost:11434"
 
 git:
-  proveedor_activo: "github"
-  organizacion: "nombre_organizacion_github"
-  repo_plantilla: "BdC-template"
-  url_plantilla: "https://github.com/nombre_organizacion_github/BdC-template"
+  # Proveedor activo: "github", "gitlab" o "self_hosted"
+  proveedor_activo: "CHANGE_ME"
+
+  # Nombre de tu usuario u organización en GitHub/GitLab
+  organizacion: "CHANGE_ME"
+
+  # Nombre del repositorio plantilla desde el que se generarán los repos de alumnos
+  repo_plantilla: "CHANGE_ME"
+  url_plantilla: "CHANGE_ME"
   rama_defecto: "main"
 
   github:
     api_base_url: "https://api.github.com"
-    pat: "pon_aqui_tu_token_de_github"
+    # Token de acceso personal (PAT) con scope completo "repo"
+    # Genera uno en: https://github.com/settings/tokens
+    pat: "CHANGE_ME"
     pat_env_var: "GITHUB_PAT"
 
   gitlab:
     api_base_url: "https://gitlab.com/api/v4"
     token_env_var: "GITLAB_TOKEN"
-    grupo_destino: "nombre_grupo_gitlab"
+    # Nombre del grupo de GitLab donde se crearán los repos
+    grupo_destino: "CHANGE_ME"
 
   self_hosted:
-    api_base_url: "https://git.midominio.com/api/v4"
+    # URL base de tu instancia autoalojada (ej. Gitea, Forgejo, GitLab CE)
+    api_base_url: "CHANGE_ME"
     token_env_var: "GIT_SELF_HOSTED_TOKEN"
 
 llm:
-  proveedor_activo: "openai"
+  # Proveedor activo: "openai", "gemini" u "ollama"
+  # La API Key correspondiente debe estar en .env (OPENAI_API_KEY o GEMINI_API_KEY)
+  proveedor_activo: "CHANGE_ME"
 
   openai:
     modelo_defecto: "gpt-4o-mini"
+    api_key: "API_KEY_CHANGE_ME"
     api_key_env_var: "OPENAI_API_KEY"
     api_base_url: "https://api.openai.com/v1"
     temperatura: 0.2
@@ -89,6 +102,7 @@ llm:
 
   gemini:
     modelo_defecto: "gemini-1.5-flash"
+    api_key: "API_KEY_CHANGE_ME"
     api_key_env_var: "GEMINI_API_KEY"
     api_base_url: "https://generativelanguage.googleapis.com/v1beta"
     temperatura: 0.2

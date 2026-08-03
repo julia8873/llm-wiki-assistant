@@ -54,13 +54,27 @@ class block_bdc_synapse_admin_client {
         $curl->setHeader('Authorization: Bearer ' . $this->token);
         $curl->setHeader('Content-Type: application/json');
         $bot_user = getenv('MATRIX_BOT_USER') ?: '@llm_wiki_bot:localhost';
-        
+
+        // Obtener el user_id del propietario del token para no invitarle (ya es el creador de la sala).
+        $whoami_curl = new \curl(['ignoresecurity' => true]);
+        $whoami_curl->setHeader('Authorization: Bearer ' . $this->token);
+        $whoami_curl->setHeader('Content-Type: application/json');
+        $whoami_resp = $whoami_curl->get($this->baseurl . '/_matrix/client/v3/account/whoami');
+        $whoami_data = json_decode($whoami_resp, true);
+        $token_owner = $whoami_data['user_id'] ?? '';
+
+        // Construir lista de invitados excluyendo al creador (ya está en la sala por ser quien la crea).
+        $to_invite = array_values(array_unique(array_filter(
+            [$invite_user_id, $bot_user],
+            fn($u) => !empty($u) && $u !== $token_owner
+        )));
+
         $payload = [
             'visibility' => 'private',
             'room_alias_name' => $room_alias,
             'name' => $room_name,
             'topic' => $topic,
-            'invite' => [$invite_user_id, $bot_user]
+            'invite' => $to_invite
         ];
         
         // Usamos el CS API estándar para crear la sala, ya que permite invitar.
