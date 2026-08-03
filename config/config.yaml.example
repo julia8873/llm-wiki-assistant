@@ -35,6 +35,12 @@ servicios:
     puerto_contenedor: 29316
     url_base: "http://localhost:29317"
 
+  mapeo_api:
+    nombre_contenedor: "moodle-matrix-dev-mapeo-api-1"
+    puerto_host: 8001
+    puerto_contenedor: 8000
+    url_base: "http://localhost:8001"
+
   docs:
     nombre_contenedor: "llm-wiki-docs"
     puerto_host: 8005

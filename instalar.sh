@@ -306,8 +306,8 @@ cmd_up() {
   
   info "Esperando a que Moodle y mapeo-api estén operativos (Healthchecks)..."
   # Leer el nombre del contenedor dinámico
-  local moodle_container=$(grep MOODLE_NOMBRE_CONTENEDOR .env | cut -d= -f2 || echo "moodle-matrix-dev-moodle-1")
-  local mapeo_api_container=$(grep MAPEO_API_NOMBRE_CONTENEDOR .env | cut -d= -f2 || echo "moodle-matrix-dev-mapeo-api-1")
+  local moodle_container=$(grep -m 1 MOODLE_NOMBRE_CONTENEDOR .env | cut -d= -f2 || echo "moodle-matrix-dev-moodle-1")
+  local mapeo_api_container=$(grep -m 1 MAPEO_API_NOMBRE_CONTENEDOR .env | cut -d= -f2 || echo "moodle-matrix-dev-mapeo-api-1")
   
   while true; do
     local m_status=$(docker inspect --format="{{if .State.Health}}{{.State.Health.Status}}{{end}}" "$moodle_container" 2>/dev/null || echo "starting")

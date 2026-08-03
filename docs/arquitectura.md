@@ -9,9 +9,9 @@ El sistema aísla la información de cada alumno para evitar contaminación cruz
 - **Lectura Restringida**: Maubot opera bajo credenciales limitadas exclusivamente al repositorio vinculado a la sala de ejecución, impidiendo el acceso a repositorios de otros estudiantes.
 - **Git Modular**: Se usa una capa de abstracción `GitProviderFactory`. Los proveedores operativos son GitHub y GitLab (vía estrategia fork+delete). Existe un módulo `self_hosted_provider.py` que actúa como un STUB (lanzará un error documentado), no funcional actualmente por diseño.
 
-Para más detalles, revisa las \subpage decisiones-tecnicas "Decisiones Técnicas".
+Para más detalles, revisa las \subpage decisiones_tecnicas "Decisiones Técnicas".
 
-Para la explicación detallada de por qué usamos "generado desde template" en lugar de "fork", ver \subpage mapeo-alumno-repositorio.md "Modelo Alumno-Repositorio".
+Para la explicación detallada de por qué usamos "generado desde template" en lugar de "fork", ver \subpage mapeo_alumno_repositorio "Modelo Alumno-Repositorio".
 
 ## Diagrama de Arquitectura Global
 

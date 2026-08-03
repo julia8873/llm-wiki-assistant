@@ -330,3 +330,13 @@ Esta fase abordó el riesgo crítico de pérdida de datos en producción introdu
   - Se eliminaron por completo y deliberadamente los volúmenes `postgres_api_data` y `redis_data` simulando un fallo catastrófico.
   - Se restauró PostgreSQL (`pg_restore -c`) y el directorio `appendonlydir` de Redis desde el último `tar.gz` generado por el cron.
   - La verificación posterior demostró la integridad total de los datos restaurados.
+
+---
+
+## Fase 9.3: Centralización de Configuración y Resolución de Bugs Doxygen
+Esta fase se centró en mejorar la mantenibilidad de la infraestructura, centralizando la configuración de contenedores y puertos, y resolviendo enlaces rotos en la documentación generada por Doxygen.
+
+### Desarrollo e Implementación
+- **Desacoplamiento de Variables de Entorno**: Se trasladó la definición de nombres de contenedores y puertos desde `config.yaml` hacia `.env.example` (como `MOODLE_NOMBRE_CONTENEDOR`, `SYNAPSE_NOMBRE_CONTENEDOR`, `MAPEO_API_NOMBRE_CONTENEDOR`, etc.). Esto permite una mayor flexibilidad al levantar los servicios con Docker Compose sin depender de un archivo YAML para variables a nivel de infraestructura.
+- **Corrección de Orquestación (`instalar.sh`)**: Se solucionó un bug en la lectura de variables de entorno mediante `grep` añadiendo el flag `-m 1`, previniendo que lecturas múltiples corrompan el nombre del contenedor durante los Healthchecks de Moodle y la API Mapeo.
+- **Refactorización de Enlaces Doxygen**: Se corrigieron las etiquetas de las subpáginas en `arquitectura.md` y `mapeo-alumno-repositorio.md` (`\subpage decisiones_tecnicas` y `{#mapeo_alumno_repositorio}`) para garantizar una correcta generación del árbol de documentación de Doxygen sin advertencias (`WARN_AS_ERROR=YES`).

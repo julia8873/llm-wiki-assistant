@@ -1,4 +1,4 @@
-# Modelo Alumno-Repositorio-Sala
+# Modelo Alumno-Repositorio-Sala {#mapeo_alumno_repositorio}
 
 *(Nota: Anteriormente referenciado como `mapeo-alumno-fork.md` en versiones antiguas de la documentación. Si llegaste aquí por un enlace antiguo, estás en el documento correcto).*
 
