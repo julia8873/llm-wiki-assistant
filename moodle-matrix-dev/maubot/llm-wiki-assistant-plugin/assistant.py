@@ -64,8 +64,11 @@ class LLMWikiAssistantPlugin(Plugin):
         try:
             self.llm_client = get_llm_client(self.app_config)
             self.repo_reader = RepoReader(self.app_config, self.vector_store, self.llm_client)
+            self.init_error = None
+            self.log.info("LlmWikiAssistantPlugin iniciado y configurado correctamente.")
         except Exception as e:
-            self.log.info("LlmWikiAssistantPlugin iniciado y configurado.")
+            self.init_error = str(e)
+            self.log.error(f"Fallo al inicializar dependencias del bot: {e}")
         self.pending_files = {}  # {user_id: {"url": mxc_url, "filename": name}}
         self.teacher_mode = {}   # {room_id: "oficial" | "carpeta"}
 

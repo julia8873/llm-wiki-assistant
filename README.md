@@ -10,45 +10,50 @@ Sistema integrado de docencia Moodle-Matrix-Git. Proporciona a cada estudiante u
 *Toda la documentación técnica completa se genera vía Doxygen. Ejecuta `./instalar.sh docs serve` para acceder a ella en [http://localhost:8005](http://localhost:8005).*
 
 ## Tabla de Contenidos
-- [Configuración Inicial Requerida](#config_inicial)
-  - [1. Variables de Entorno (`moodle-matrix-dev/.env`)](#vars_entorno)
-  - [2. Configuración Global (`config/config.yaml`)](#config_global)
+- [Guía de Instalación y Puesta en Marcha](#paso_a_paso)
 - [Comandos Operativos Base (Desarrollo)](#comandos_base)
 - [Funcionalidades del Bot en Matrix (OKF v0.1)](#funcionalidades_bot)
 - [Credenciales de Prueba](#credenciales_prueba)
 - [Inventario de Componentes y Carpetas Clave](#inventario_componentes)
 - [Fases de Implementación y Estado](#fases_implementacion)
 
-## Configuración Inicial Requerida {#config_inicial}
+## Guía de Instalación y Puesta en Marcha {#paso_a_paso}
 
-Antes de levantar el proyecto, debes configurar las credenciales y parámetros de los servicios externos. Estas configuraciones se dividen en dos archivos principales:
+Sigue estos pasos para iniciar el proyecto. El orquestador principal te guiará durante el proceso y generará las plantillas de configuración automáticamente.
 
-### 1. Variables de Entorno (`moodle-matrix-dev/.env`) {#vars_entorno}
-Copia el archivo `moodle-matrix-dev/.env.example` a `moodle-matrix-dev/.env` y completa los siguientes valores esenciales:
+### Paso 1: Levantar el entorno base
+Ejecuta el script principal por primera vez. Levantará la infraestructura inicial e imprimirá un panel interactivo con las credenciales que faltan por configurar.
+```bash
+./instalar.sh
+```
 
-- **Claves de LLM (Configura solo la del proveedor que vayas a usar):**
-  - `OPENAI_API_KEY`: Requerida si usas OpenAI. Consíguela en el panel de [OpenAI API Keys](https://platform.openai.com/api-keys).
-  - `GEMINI_API_KEY`: Requerida si usas Google Gemini. Consíguela en [Google AI Studio](https://aistudio.google.com/app/apikey).
-  - *(Nota: Si usas Ollama de forma local, no necesitas API Key, pero debes activarlo en `config.yaml`)*.
+### Paso 2: Completar Credenciales
+Al finalizar el paso anterior, los contenedores estarán operativos pero requerirán tus claves. Copia y edita los archivos (el script te indicará cuáles faltan en el panel `ACCIÓN REQUERIDA`):
 
-- **Credenciales de Matrix:**
-  - `MATRIX_ACCESS_TOKEN`: Token de administrador necesario para crear salas y usuarios automáticamente.
-    - *Cómo obtenerlo:* Una vez levantado Synapse/Element (Fase 1), inicia sesión en tu cliente Element con la cuenta de administrador. Ve a **Ajustes -> Ayuda e información -> Avanzado -> Token de acceso** y cópialo aquí.
+1. **`moodle-matrix-dev/.env`**:
+   - `OPENAI_API_KEY` o `GEMINI_API_KEY`: Clave de tu proveedor de IA (desde OpenAI Platform o Google AI Studio).
+   - `MATRIX_ACCESS_TOKEN`: Token de administrador. Para obtenerlo, abre Element ([http://localhost:8081](http://localhost:8081)), inicia sesión con las credenciales por defecto (`admin` / `adminpass123`), ve a **Ajustes -> Ayuda e información -> Avanzado -> Token de acceso** y cópialo.
+   - `MAPEO_API_TOKEN`: Puedes dejarlo en `changeme` para que el script inyecte un token seguro automáticamente.
 
-- **Tokens Internos Seguros:**
-  - `MAPEO_API_TOKEN`: Si lo dejas como `changeme`, el script de instalación (`instalar.sh`) inyectará automáticamente un token seguro generado criptográficamente al vuelo.
+2. **`config/config.yaml`**:
+   - `git.proveedor_activo` y `git.organizacion`: Tu proveedor para crear los repositorios de alumnos (GitHub, GitLab, etc).
+   - `git.github.pat`: Tu token personal si usas GitHub (con permisos de `repo`).
+   - `llm.proveedor_activo`: Indica el motor de IA (`openai`, `gemini`, `ollama`).
 
-### 2. Configuración Global (`config/config.yaml`) {#config_global}
-Copia el archivo `config/config.yaml.example` a `config/config.yaml` y revisa los siguientes bloques obligatorios:
+### Paso 3: Aplicar Configuración
+Una vez hayas introducido tus tokens y claves, vuelve a lanzar el orquestador. Aplicará los cambios en todo el sistema:
+```bash
+./instalar.sh up
+```
 
-- **Configuración del Repositorio (Git):**
-  - `git.proveedor_activo`: Elige entre `github`, `gitlab` o `self_hosted`.
-  - `git.organizacion`: Tu nombre de usuario o nombre de la organización donde se crearán los repositorios.
-  - `git.github.pat`: Tu Personal Access Token (PAT) de GitHub (si usas GitHub).
-    - *Cómo obtenerlo:* Ve a [GitHub Developer Settings](https://github.com/settings/tokens). Genera un token (Classic) y asegúrate de marcar al menos el scope completo de `repo`.
+### Paso 4: Desplegar el Bot (Maubot)
+El script de instalación ya empaquetó tu bot, pero debes registrarlo en el motor de bots:
+1. Accede a [http://localhost:29317/_matrix/maubot/](http://localhost:29317/_matrix/maubot/) e inicia sesión (`admin` / tu `MAUBOT_ADMIN_PASSWORD`).
+2. **Plugins:** Sube el archivo local ubicado en `moodle-matrix-dev/maubot/llm-wiki-assistant-plugin/plugin.mbp`.
+3. **Clients:** Añade un cliente con User ID `@llm_wiki_bot:localhost`, Homeserver `http://synapse:8008`, y pega el **Token del bot** que te imprimió `./instalar.sh` en la consola (deja la contraseña en blanco).
+4. **Instances:** Crea una nueva instancia vinculando el Cliente y el Plugin que acabas de subir.
 
-- **Selección del Motor LLM:**
-  - `llm.proveedor_activo`: Indica el motor de IA que usarás por defecto (`openai`, `gemini`, `ollama`).
+¡Listo! El bot ya estará escuchando en la red Matrix para ser invitado automáticamente a las salas de los alumnos.
 
 ## Comandos Operativos Base (Desarrollo) {#comandos_base}
 

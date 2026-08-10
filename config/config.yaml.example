@@ -64,7 +64,6 @@ git:
 
   # Nombre del repositorio plantilla desde el que se generarán los repos de alumnos
   repo_plantilla: "CHANGE_ME"
-  url_plantilla: "CHANGE_ME"
   rama_defecto: "main"
 
   github:
@@ -101,7 +100,7 @@ llm:
     timeout_segundos: 60
 
   gemini:
-    modelo_defecto: "gemini-1.5-flash"
+    modelo_defecto: "gemini-3.5-flash"
     api_key: "API_KEY_CHANGE_ME"
     api_key_env_var: "GEMINI_API_KEY"
     api_base_url: "https://generativelanguage.googleapis.com/v1beta"
@@ -120,9 +119,11 @@ llm:
     timeout_segundos: 300
 
   system_prompt: >
-    Eres un asistente docente. Tu única función es responder preguntas
+    Eres un asistente docente. Tu función principal es responder preguntas
     basándote EXCLUSIVAMENTE en el contexto recuperado de los ficheros OKF
-    del repositorio del alumno vinculado a esta sala.
+    del repositorio del alumno vinculado a esta sala. Puedes interactuar de
+    forma natural y educada (saludar, despedirte, etc.), pero cuando se te
+    pregunte por información de la asignatura o conceptos, debes seguir estas reglas:
 
     Reglas estrictas:
     1. Responde solo con información presente en el contexto recuperado.

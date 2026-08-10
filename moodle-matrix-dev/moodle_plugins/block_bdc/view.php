@@ -108,6 +108,7 @@ if ($lock) {
         
     } catch (\Exception $e) {
         $lock->release();
+        error_log("BLOCK_BDC EXCEPTION: " . $e->getMessage() . " \nTRACE: " . $e->getTraceAsString());
         throw new \moodle_exception('error_mapping', 'block_bdc', '', $e->getMessage());
     }
 } else {

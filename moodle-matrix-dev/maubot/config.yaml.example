@@ -24,7 +24,7 @@ plugin_config:
 
   gemini_api_key: "AIzaSy_CHANGE_ME"
   gemini_base_url: "https://generativelanguage.googleapis.com/v1beta"
-  gemini_model: "gemini-1.5-flash"
+  gemini_model: "gemini-3.5-flash"
 
   ollama_base_url: "http://ollama-llm-service:11434"
   ollama_model: "llama3"

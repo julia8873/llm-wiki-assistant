@@ -149,6 +149,14 @@ warn_pending_config() {
     echo "      3. Ajustes → Ayuda e información → Avanzado → Token de acceso"
     echo "      4. Pégalo en .env como:  MATRIX_ACCESS_TOKEN=syt_..."
     echo ""
+    
+    local bot_token=$(grep -E "^BOT_ACCESS_TOKEN=" "${ROOT_DIR}/.env" | cut -d= -f2- || true)
+    if [[ -n "$bot_token" ]]; then
+      echo "  TOKEN DEL BOT (llm_wiki_bot) PARA MAUBOT:"
+      echo "      $bot_token"
+      echo ""
+    fi
+
     echo "  Cuando hayas rellenado los archivos, ejecuta de nuevo:"
     echo "      ./instalar.sh up"
     echo "--------------------------------------------------------------------"
@@ -302,6 +310,27 @@ generate_env() {
       fi
     fi
   done
+  
+  # Parchear credenciales de Maubot en su config.yaml (vía Docker para evitar permisos denegados)
+  local m_pass; m_pass=$(grep -m 1 "^MAUBOT_ADMIN_PASSWORD=" "$root_env" 2>/dev/null | cut -d= -f2- | tr -d '\r' || true)
+  local m_key; m_key=$(grep -m 1 "^MAUBOT_CRYPTO_PICKLE_KEY=" "$root_env" 2>/dev/null | cut -d= -f2- | tr -d '\r' || true)
+  
+  if [[ -n "$m_pass" || -n "$m_key" ]]; then
+    info "Inyectando credenciales en Maubot..."
+    check_docker
+    docker run --rm -v "${ROOT_DIR}/moodle-matrix-dev/maubot:/data" alpine sh -c "
+      if [ -n \"$m_pass\" ]; then
+        sed -i -e \"s|root: ''|admin: \\\"${m_pass}\\\"|\" -e \"s|admin: \\\"CHANGE_ME_PASSWORD\\\"|admin: \\\"${m_pass}\\\"|\" /data/config.yaml 2>/dev/null || true
+      fi
+      if [ -n \"$m_key\" ]; then
+        sed -i \"s|pickle_key: .*|pickle_key: \\\"${m_key}\\\"|\" /data/config.yaml 2>/dev/null || true
+      fi
+    "
+    # Reiniciamos maubot por si estaba corriendo, para que tome el nuevo config.yaml
+    docker compose -f "${ROOT_DIR}/moodle-matrix-dev/docker-compose.yml" restart maubot >/dev/null 2>&1 || true
+  fi
+
+  return 0
 }
 
 ## @fn print_summary()
@@ -356,22 +385,22 @@ setup_synapse_admin() {
 
   # 1. Intentar login para obtener token fresco
   local login_resp
-  login_resp=$(curl -sf -X POST "${synapse_url}/_matrix/client/v3/login" \
+  login_resp=$(curl -sf --max-time 10 -X POST "${synapse_url}/_matrix/client/v3/login" \
     -H 'Content-Type: application/json' \
     -d "{\"type\":\"m.login.password\",\"user\":\"${admin_user}\",\"password\":\"${admin_pass}\"}" 2>/dev/null || echo '')
-  local fresh_token; fresh_token=$(echo "$login_resp" | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4)
+  local fresh_token; fresh_token=$(echo "$login_resp" | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4 || true)
 
   if [[ -z "$fresh_token" ]]; then
-    # Usuario no existe aún — registrarlo
     info "Registrando usuario admin en Synapse..."
     docker exec moodle-matrix-dev-synapse-1 \
       register_new_matrix_user -c /data/homeserver.yaml --admin \
       -u "$admin_user" -p "$admin_pass" http://localhost:8008 2>/dev/null || true
+
     # Reintentar login
     login_resp=$(curl -sf -X POST "${synapse_url}/_matrix/client/v3/login" \
       -H 'Content-Type: application/json' \
       -d "{\"type\":\"m.login.password\",\"user\":\"${admin_user}\",\"password\":\"${admin_pass}\"}" 2>/dev/null || echo '')
-    fresh_token=$(echo "$login_resp" | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4)
+    fresh_token=$(echo "$login_resp" | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4 || true)
   fi
 
   if [[ -z "$fresh_token" ]]; then
@@ -383,17 +412,26 @@ setup_synapse_admin() {
   local user_info
   user_info=$(curl -sf -H "Authorization: Bearer ${fresh_token}" \
     "${synapse_url}/_synapse/admin/v2/users/@${admin_user}:localhost" 2>/dev/null || echo '')
-  local is_admin; is_admin=$(echo "$user_info" | grep -o '"admin":[^,}]*' | cut -d: -f2 | tr -d ' ')
+  local is_admin; is_admin=$(echo "$user_info" | grep -o '"admin":[^,}]*' | cut -d: -f2 | tr -d ' ' || true)
 
   if [[ "$is_admin" == "true" ]]; then
     ok "@${admin_user}:localhost ya es admin de Synapse."
   else
-    info "Promoviendo @${admin_user}:localhost a admin de Synapse..."
-    curl -sf -X PUT "${synapse_url}/_synapse/admin/v1/users/@${admin_user}:localhost/admin" \
-      -H "Authorization: Bearer ${fresh_token}" \
-      -H 'Content-Type: application/json' \
-      -d '{"admin":true}' > /dev/null
-    ok "@${admin_user}:localhost promovido a admin de Synapse."
+    info "Promoviendo @${admin_user}:localhost a admin de Synapse (vía DB)..."
+    docker exec moodle-matrix-dev-synapse-1 python -c "import sqlite3; conn = sqlite3.connect('/data/homeserver.db'); conn.execute('UPDATE users SET admin = 1 WHERE name = \'@${admin_user}:localhost\''); conn.commit(); conn.close()" 2>/dev/null || true
+    # Reiniciar synapse para asegurar que el cambio de DB se aplique en memoria
+    docker restart moodle-matrix-dev-synapse-1 >/dev/null
+    
+    # Esperar a que vuelva a levantar
+    sleep 5
+    while true; do
+      local s_status=$(docker inspect --format="{{if .State.Health}}{{.State.Health.Status}}{{end}}" "moodle-matrix-dev-synapse-1" 2>/dev/null || echo "starting")
+      if [[ "$s_status" == "healthy" ]]; then
+        break
+      fi
+      sleep 2
+    done
+    ok "@${admin_user}:localhost promovido a admin de Synapse y servicio reiniciado."
   fi
 
   # 3. Si el token en .env es distinto al fresco (o no existía), actualizarlo
@@ -406,6 +444,38 @@ setup_synapse_admin() {
     sed -i "s|^MATRIX_ACCESS_TOKEN=.*|MATRIX_ACCESS_TOKEN=${fresh_token}|" "$inner_env" 2>/dev/null || \
       sed -i '' "s|^MATRIX_ACCESS_TOKEN=.*|MATRIX_ACCESS_TOKEN=${fresh_token}|" "$inner_env"
     ok "MATRIX_ACCESS_TOKEN actualizado en .env y moodle-matrix-dev/.env"
+  fi
+}
+
+## @fn setup_bot_token()
+## @brief Registra el bot en Synapse y obtiene su Access Token, guardándolo en .env
+setup_bot_token() {
+  local root_env="${ROOT_DIR}/.env"
+  local bot_token; bot_token=$(grep -E "^BOT_ACCESS_TOKEN=" "$root_env" | cut -d= -f2- || true)
+  
+  if [[ -z "$bot_token" ]]; then
+    info "Generando Access Token para el bot (llm_wiki_bot)..."
+    local bot_pass; bot_pass=$(grep -m 1 "^SYNAPSE_ADMIN_PASSWORD=" "$root_env" | cut -d= -f2- | tr -d '\r')
+    
+    # 1. Registrar usuario bot
+    docker exec moodle-matrix-dev-synapse-1 \
+      register_new_matrix_user -c /data/homeserver.yaml --no-admin \
+      -u "llm_wiki_bot" -p "$bot_pass" http://localhost:8008 2>/dev/null || true
+      
+    # 2. Hacer login para obtener token
+    local login_resp
+    login_resp=$(curl -sf -X POST "http://localhost:8008/_matrix/client/v3/login" \
+      -H 'Content-Type: application/json' \
+      -d "{\"type\":\"m.login.password\",\"user\":\"llm_wiki_bot\",\"password\":\"${bot_pass}\"}" 2>/dev/null || echo '')
+      
+    bot_token=$(echo "$login_resp" | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4 || true)
+    
+    if [[ -n "$bot_token" ]]; then
+      echo "BOT_ACCESS_TOKEN=${bot_token}" >> "$root_env"
+      ok "Access Token del bot generado exitosamente."
+    else
+      warn "No se pudo generar el Access Token para el bot."
+    fi
   fi
 }
 
@@ -477,6 +547,21 @@ EOF
         ok "Synapse reiniciado con soporte SSO."
       fi
 
+      # Esperar a que Synapse esté disponible y configurar admin y bot
+      info "Esperando a que Synapse esté operativo (Healthcheck)..."
+      local synapse_container=$(grep -m 1 SYNAPSE_NOMBRE_CONTENEDOR .env | cut -d= -f2 | tr -d '\r' || echo "moodle-matrix-dev-synapse-1")
+      while true; do
+        local s_status=$(docker inspect --format="{{if .State.Health}}{{.State.Health.Status}}{{end}}" "$synapse_container" 2>/dev/null || echo "starting")
+        if [[ "$s_status" == "healthy" ]]; then
+          setup_synapse_admin
+          setup_bot_token
+          break
+        elif [[ "$s_status" == "unhealthy" ]]; then
+          error "Synapse falló el healthcheck. Revisa 'docker logs $synapse_container'."
+        fi
+        sleep 5
+      done
+
       # Registrar y promover al admin de Synapse automáticamente
       setup_synapse_admin
 
@@ -536,11 +621,7 @@ cmd_bot() {
         info "Empaquetando el plugin de Maubot (Fase 5)..."
         check_docker
         docker run --rm -v "${ROOT_DIR}/moodle-matrix-dev/maubot/llm-wiki-assistant-plugin:/plugin" alpine sh -c "apk add --no-cache zip && cd /plugin && zip -r plugin.mbp . -x '*/__pycache__/*' -x '*.pyc'"
-        mkdir -p "${ROOT_DIR}/moodle-matrix-dev/maubot/plugins/"
-        rm -f "${ROOT_DIR}/moodle-matrix-dev/maubot/plugins/"*.mbp
-        cp "${ROOT_DIR}/moodle-matrix-dev/maubot/llm-wiki-assistant-plugin/plugin.mbp" "${ROOT_DIR}/moodle-matrix-dev/maubot/plugins/"
-        rm -f "${ROOT_DIR}/moodle-matrix-dev/maubot/llm-wiki-assistant-plugin/plugin.mbp"
-        ok "Plugin empaquetado y copiado a moodle-matrix-dev/maubot/plugins/plugin.mbp"
+        ok "Plugin empaquetado exitosamente en moodle-matrix-dev/maubot/llm-wiki-assistant-plugin/plugin.mbp"
       fi
       ;;
     sync)

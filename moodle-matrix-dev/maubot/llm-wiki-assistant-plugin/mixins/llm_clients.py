@@ -33,7 +33,8 @@ class OpenAICompatibleClient(LLMClient):
         self.top_p = self.config.get("top_p", 0.95)
         self.timeout = self.config.get("timeout_segundos", 60)
         
-        self.api_key = os.environ.get(self.api_key_env_var, self.api_key_env_var)
+        env_key = os.environ.get(self.api_key_env_var) if self.api_key_env_var else None
+        self.api_key = env_key or self.config.get("api_key") or self.api_key_env_var
         
         # Permitimos API keys dummy para proveedores que no lo exigen (ej. Ollama local)
         # Pero si el endpoint está vacío, fallamos.
@@ -109,7 +110,8 @@ class GeminiClient(LLMClient):
         self.top_p = self.config.get("top_p", 0.95)
         self.timeout = self.config.get("timeout_segundos", 60)
         
-        self.api_key = os.environ.get(self.api_key_env_var, self.api_key_env_var)
+        env_key = os.environ.get(self.api_key_env_var) if self.api_key_env_var else None
+        self.api_key = env_key or self.config.get("api_key") or self.api_key_env_var
         if not self.api_key:
             raise LLMClientError(f"API key requerida en la variable {self.api_key_env_var}")
             

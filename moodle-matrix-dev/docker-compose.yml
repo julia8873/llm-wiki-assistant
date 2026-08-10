@@ -123,6 +123,8 @@ services:
     environment:
       - MAPEO_API_TOKEN=${MAPEO_API_TOKEN}
       - GITHUB_PAT=${GITHUB_PAT}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
     ports:
       - "${MAUBOT_PUERTO_HOST}:${MAUBOT_PUERTO_CONTENEDOR}"
     volumes:
@@ -185,6 +187,8 @@ services:
     environment:
       - MAPEO_API_TOKEN=${MAPEO_API_TOKEN}
       - GITHUB_PAT=${GITHUB_PAT}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
       - PYTHONPATH=/data/llm-wiki-assistant-plugin
     volumes:
       - ./maubot:/data
@@ -203,6 +207,8 @@ services:
     environment:
       - MAPEO_API_TOKEN=${MAPEO_API_TOKEN}
       - GITHUB_PAT=${GITHUB_PAT}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
       - PYTHONPATH=/data/llm-wiki-assistant-plugin
     volumes:
       - ./maubot:/data
