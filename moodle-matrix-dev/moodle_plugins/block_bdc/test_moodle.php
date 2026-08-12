@@ -1,10 +1,10 @@
 <?php
 require_once('/var/www/html/config.php');
-\ = context_course::instance(7);
-\ = get_user_roles(\, 4);
-foreach(\ as \) { echo \->shortname . ' '; }
+$ctx = context_course::instance(7);
+$roles = get_user_roles($ctx, 4);
+foreach($roles as $role) { echo $role->shortname . ' '; }
 var_dump(
-    has_capability('moodle/course:update', \, 4),
-    has_capability('moodle/course:viewhiddenactivities', \, 4),
-    has_capability('moodle/grade:edit', \, 4)
+    has_capability('moodle/course:update', $ctx, 4),
+    has_capability('moodle/course:viewhiddenactivities', $ctx, 4),
+    has_capability('moodle/grade:edit', $ctx, 4)
 );

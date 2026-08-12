@@ -1,0 +1,40 @@
+/home/julia/llm-wiki-assistant/moodle-matrix-dev/test_gemini_5_chunks.py:46: SyntaxWarning: "\q" is an invalid escape sequence. Such sequences will not work in the future. Did you mean "\\q"? A raw string is also an option.
+  $$x' = f(t, x), \quad x(t_0) = x_0$$
+Tokens: 927
+Finish reason: STOP
+Response: Basándome en la información recuperada de tu repositorio, esto es lo que se detalla sobre el **Teorema de Existencia y Unicidad de Soluciones**:
+
+### 1. Principios Fundamentales y el Teorema de Picard-Lindelöf
+Determinar si un problema de valores iniciales (PVI) posee una solución bien definida y si esta es única es un paso fundamental antes de intentar resolverlo analítica o numéricamente (*profesores/profesor1/okf/concepts/teorema-existencia-unicidad.md*).
+
+Para un PVI de la forma:
+$$x' = f(t, x), \quad x(t_0) = x_0$$
+
+El **Teorema de Picard-Lindelöf** establece que si la función $f(t, x)$ cumple con:
+1. Ser **continua** en un entorno de $(t_0, x_0)$.
+2. Ser **localmente Lipschitziana** respecto a la variable $x$ en dicho entorno.
+
+Entonces, existe un intervalo abierto que contiene a $t_0$ donde el problema tiene una **única solución** (*profesores/profesor1/okf/concepts/teorema-existencia-unicidad.md*).
+
+---
+
+### 2. Aplicación a Ecuaciones Integrales y Contracciones
+Muchos problemas de existencia y unicidad se reformulan como problemas de punto fijo para operadores integrales en espacios de Banach (como $C[a, b]$) (*profesores/profesor1/okf/concepts/teorema-existencia-unicidad.md*):
+
+* **Teorema del Punto Fijo de Banach:** Si un operador integral es una contracción (es decir, su constante de Lipschitz cumple que $L < 1$), entonces posee un único punto fijo, lo que equivale a la existencia y unicidad de la solución (*profesores/profesor1/okf/concepts/teorema-existencia-unicidad.md*).
+
+---
+
+### 3. Aplicaciones Prácticas y Ejemplos de Examen
+Este teorema y sus herramientas asociadas se aplican directamente en la resolución de problemas de evaluación, como se observa en la *Primera Prueba de Clase de Ecuaciones Diferenciales II (UGR, 2022)* (*profesores/profesor1/okf/sources/ugr-ed2-prueba-20220404.md*):
+
+* **Sistemas de Ecuaciones Integrales (Ejercicio 3):** Se plantea analizar si existe una solución continua y única definida en $]-\infty, \infty[$ para el sistema:
+  $$x_1(t) = -\int_{0}^{t} x_2(s)ds, \quad x_2(t) = \int_{\pi}^{t} x_1(s)ds$$
+  (*profesores/profesor1/okf/sources/ugr-ed2-prueba-20220404.md*).
+* **Problema de Valores Iniciales (Ejercicio 4):** Se evalúa la existencia, unicidad e intervalo maximal para el PVI:
+  $$x' = \frac{\sqrt{3-t^2}}{1 + x^2}, \quad x(0) = 0$$
+  (*profesores/profesor1/okf/sources/ugr-ed2-prueba-20220404.md*).
+* **Unicidad mediante Operadores Contractivos (Ejercicio 5):** Se utiliza la hipótesis de una constante de Lipschitz $L < 1/2$ para demostrar que existe a lo sumo una solución continua para la ecuación integral:
+  $$x(t) = \int_{-t}^{t} F(s, x(s))ds$$
+  donde $F$ es continua y Lipschitz en $[-1, 1] \times \mathbb{R}$ (*profesores/profesor1/okf/concepts/teorema-existencia-unicidad.md* y *profesores/profesor1/okf/sources/ugr-ed2-prueba-20220404.md*).
+

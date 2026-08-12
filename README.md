@@ -78,7 +78,7 @@ El script de instalación ya empaquetó tu bot, pero debes registrarlo en el mot
 ```
 
 > [!WARNING]
-> **Aviso de Seguridad en Producción (Element Web)**: Durante la fase de desarrollo e integración, se han desactivado los avisos de cifrado de extremo a extremo (E2EE) y de copias de seguridad de claves (`UIFeature.keyBackup` y `UIFeature.crossSigning`) en `moodle-matrix-dev/element-config.json` para facilitar las pruebas del bot LLM sin fricción. Antes de desplegar el entorno en producción para la Universidad, se debe evaluar si se requiere E2EE estricto y, en tal caso, volver a activar estas variables.
+> **Aviso de Seguridad en Producción (Element Web)**: Durante la fase de desarrollo e integración, se han desactivado los avisos de cifrado de extremo a extremo (E2EE) y de copias de seguridad de claves (`UIFeature.keyBackup` y `UIFeature.crossSigning`) en `moodle-matrix-dev/element-config.json` para facilitar las pruebas del bot LLM sin fricción. Antes de desplegar el entorno en producción, se debe evaluar si se requiere E2EE estricto y, en tal caso, volver a activar estas variables.
 
 ## Funcionalidades del Bot en Matrix (OKF v0.1) {#funcionalidades_bot}
 El Bot LLM implementa una ingesta automatizada siguiendo el estándar OKF v0.1 (`AGENTS.md`). Cuando se le envía un archivo, el bot genera una abstracción completa en el repositorio, creando:
@@ -117,15 +117,3 @@ Para probar el flujo de autenticación delegada (SSO) y la provisión de reposit
 | `moodle-matrix-dev/maubot/llm-wiki-assistant-plugin/git_utils.py` | Módulo compartido de utilidades Git usado concurrentemente por Ingesta OKF, Sync, y Logging. Contiene el *Distributed Repo Lock*. |
 | `moodle-matrix-dev/moodle_plugins/block_bdc/` | Plugin de Moodle que intercepta el inicio de sesión y llama a `mapeo-api`. |
 
-## Fases de Implementación y Estado {#fases_implementacion}
-- ✅ **Fase 0.1**: Documentación Doxygen y Configuración Base.
-- ✅ **Fase 1**: Infraestructura Docker Compose.
-- ✅ **Fase 2**: Almacén de Mapeos (FastAPI + SQLite).
-- ✅ **Fase 3**: Bloque Moodle `block_bdc`.
-- ✅ **Fase 4**: Provisionamiento de Repositorios y Pruebas de Integración.
-- ✅ **Fase 4.2**: Refactorización de Proveedores Git (Factory / GitLab / Webhooks).
-- ✅ **Fase 5**: Plugin Maubot (LLM, RAG, y Extracción OKF).
-- ✅ **Fase 5.1**: Sincronización Ascendente (Upstream Sync).
-- ✅ **Fase 6**: Registro de Interacciones y Distributed Locking (Redis).
-- ✅ **Fase 7**: Orquestador de Pruebas Consolidado (`instalar.sh --test`) y control de regresiones.
-- 🎯 **Fase 8**: Documentación Completa.

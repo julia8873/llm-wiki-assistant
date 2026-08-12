@@ -116,6 +116,8 @@ class GeminiClient(LLMClient):
             raise LLMClientError(f"API key requerida en la variable {self.api_key_env_var}")
             
     async def get_response(self, system_prompt: str, user_prompt: str, max_tokens_override: int = None) -> str:
+        import logging
+        logging.getLogger("llm_wiki.debug").error(f"SYSTEM PROMPT: {system_prompt}")
         url = f"{self.api_base_url}/models/{self.modelo}:generateContent?key={self.api_key}"
         headers = {"Content-Type": "application/json"}
         payload = {
@@ -133,15 +135,36 @@ class GeminiClient(LLMClient):
         }
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
-            try:
-                response = await client.post(url, json=payload, headers=headers)
-                response.raise_for_status()
-                data = response.json()
-                return data["candidates"][0]["content"]["parts"][0]["text"]
-            except httpx.HTTPStatusError as e:
-                raise LLMClientError(f"Error HTTP de Gemini: {e.response.status_code} - {e.response.text}")
-            except Exception as e:
-                raise LLMClientError(f"Error de conexión con Gemini: {str(e)}")
+            max_retries = 3
+            base_delay = 10
+            for attempt in range(max_retries):
+                try:
+                    response = await client.post(url, json=payload, headers=headers)
+                    response.raise_for_status()
+                    data = response.json()
+                    response_text = "".join([p.get("text", "") for p in data["candidates"][0]["content"]["parts"]])
+                    logging.getLogger("llm_wiki.debug").error(f"MAX TOKENS CONF: {self.max_tokens}")
+                    logging.getLogger("llm_wiki.debug").error(f"GEMINI RAW DATA: {data}")
+                    return response_text
+                except httpx.HTTPStatusError as e:
+                    if e.response.status_code == 429 and attempt < max_retries - 1:
+                        import asyncio
+                        delay = base_delay * (2 ** attempt)
+                        try:
+                            error_data = e.response.json()
+                            for detail in error_data.get("error", {}).get("details", []):
+                                if detail.get("@type") == "type.googleapis.com/google.rpc.RetryInfo":
+                                    delay_str = detail.get("retryDelay", "")
+                                    if delay_str.endswith("s"):
+                                        delay = float(delay_str[:-1])
+                        except Exception:
+                            pass
+                        logging.getLogger("llm_wiki.debug").warning(f"Rate limit excedido (429). Reintentando en {delay}s... (Intento {attempt + 1}/{max_retries})")
+                        await asyncio.sleep(delay + 1.0)
+                        continue
+                    raise LLMClientError(f"Error HTTP de Gemini: {e.response.status_code} - {e.response.text}")
+                except Exception as e:
+                    raise LLMClientError(f"Error de conexión con Gemini: {str(e)}")
 
     async def get_response_with_file(self, system_prompt: str, user_prompt: str, file_bytes: bytes, mime_type: str = "application/pdf") -> str:
         import base64
@@ -172,15 +195,36 @@ class GeminiClient(LLMClient):
         }
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
-            try:
-                response = await client.post(url, json=payload, headers=headers)
-                response.raise_for_status()
-                data = response.json()
-                return data["candidates"][0]["content"]["parts"][0]["text"]
-            except httpx.HTTPStatusError as e:
-                raise LLMClientError(f"Error HTTP de Gemini OCR: {e.response.status_code} - {e.response.text}")
-            except Exception as e:
-                raise LLMClientError(f"Error de conexion con Gemini OCR: {str(e)}")
+            max_retries = 3
+            base_delay = 10
+            for attempt in range(max_retries):
+                try:
+                    response = await client.post(url, json=payload, headers=headers)
+                    response.raise_for_status()
+                    data = response.json()
+                    response_text = "".join([p.get("text", "") for p in data["candidates"][0]["content"]["parts"]])
+                    logging.getLogger("llm_wiki.debug").error(f"MAX TOKENS CONF: {self.max_tokens}")
+                    logging.getLogger("llm_wiki.debug").error(f"GEMINI RAW DATA: {data}")
+                    return response_text
+                except httpx.HTTPStatusError as e:
+                    if e.response.status_code == 429 and attempt < max_retries - 1:
+                        import asyncio
+                        delay = base_delay * (2 ** attempt)
+                        try:
+                            error_data = e.response.json()
+                            for detail in error_data.get("error", {}).get("details", []):
+                                if detail.get("@type") == "type.googleapis.com/google.rpc.RetryInfo":
+                                    delay_str = detail.get("retryDelay", "")
+                                    if delay_str.endswith("s"):
+                                        delay = float(delay_str[:-1])
+                        except Exception:
+                            pass
+                        logging.getLogger("llm_wiki.debug").warning(f"Rate limit excedido OCR (429). Reintentando en {delay}s... (Intento {attempt + 1}/{max_retries})")
+                        await asyncio.sleep(delay + 1.0)
+                        continue
+                    raise LLMClientError(f"Error HTTP de Gemini OCR: {e.response.status_code} - {e.response.text}")
+                except Exception as e:
+                    raise LLMClientError(f"Error de conexion con Gemini OCR: {str(e)}")
 
     async def get_embedding(self, text: str) -> list[float]:
         url = f"{self.api_base_url}/models/gemini-embedding-2:embedContent?key={self.api_key}"
@@ -193,13 +237,25 @@ class GeminiClient(LLMClient):
         }
         
         async with httpx.AsyncClient(timeout=self.timeout) as client:
-            try:
-                response = await client.post(url, json=payload, headers=headers)
-                response.raise_for_status()
-                data = response.json()
-                return data["embedding"]["values"]
-            except Exception as e:
-                raise LLMClientError(f"Error obteniendo embedding de Gemini: {str(e)}")
+            max_retries = 3
+            base_delay = 5
+            for attempt in range(max_retries):
+                try:
+                    response = await client.post(url, json=payload, headers=headers)
+                    response.raise_for_status()
+                    data = response.json()
+                    return data["embedding"]["values"]
+                except httpx.HTTPStatusError as e:
+                    if e.response.status_code == 429 and attempt < max_retries - 1:
+                        import asyncio
+                        import logging
+                        delay = base_delay * (2 ** attempt)
+                        logging.getLogger("llm_wiki.debug").warning(f"Rate limit excedido embedding (429). Reintentando en {delay}s... (Intento {attempt + 1}/{max_retries})")
+                        await asyncio.sleep(delay + 1.0)
+                        continue
+                    raise LLMClientError(f"Error HTTP de Gemini embedding: {e.response.status_code} - {e.response.text}")
+                except Exception as e:
+                    raise LLMClientError(f"Error obteniendo embedding de Gemini: {str(e)}")
 
 def get_llm_client(config: Dict[str, Any]) -> LLMClient:
     llm_config = config.get("llm", {})

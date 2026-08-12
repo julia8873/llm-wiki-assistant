@@ -58,7 +58,7 @@ class RepoReader:
         chunks_to_insert = []
         
         for root, _, files in os.walk(local_path):
-            if ".git" in root:
+            if ".git" in root.split(os.sep) or root.endswith(".git"):
                 continue
             for file in files:
                 ext = os.path.splitext(file)[1].lower()
@@ -118,6 +118,9 @@ class RepoReader:
         if is_teacher and teacher_mode == "carpeta":
             prefix = f"profesores/{moodle_username}/"
             results = [r for r in results if r["file_path"].startswith(prefix)]
+            
+        # Restringir a la hora de contestar para que solo use ficheros OKF
+        results = [r for r in results if "okf/" in r["file_path"] or "/okf" in r["file_path"] or r["file_path"].startswith("okf")]
             
         return results
 

@@ -344,12 +344,12 @@ print_summary() {
   echo "=== RESUMEN DE SERVICIOS (Fase 1) ==="
   echo "Servicio    URL                              Credenciales"
   echo "----------------------------------------------------------------"
-  echo "Moodle      http://localhost:${MOODLE_PUERTO_HOST:-8000}           ${MOODLE_USERNAME:-admin} / ${MOODLE_PASSWORD:-adminpass123}"
-  echo "Matrix      http://localhost:${SYNAPSE_PUERTO_HOST:-8008}           -"
-  echo "Element     http://localhost:${ELEMENT_PUERTO_HOST:-8081}           -"
-  echo "Maubot      http://localhost:${MAUBOT_PUERTO_HOST:-29317}          -"
-  echo "Doxygen     http://localhost:8005            -"
-  echo "Mapeo API   http://mapeo-api:8000            (Solo red interna Docker. Token: ${MAPEO_API_TOKEN})"
+  echo "Moodle      http://localhost:${MOODLE_PUERTO_HOST:-8000}                        ${MOODLE_USERNAME:-admin} / ${MOODLE_PASSWORD:-adminpass123}"
+  echo "Matrix      http://localhost:${SYNAPSE_PUERTO_HOST:-8008}                        -"
+  echo "Element     http://localhost:${ELEMENT_PUERTO_HOST:-8081}                        -"
+  echo "Maubot      http://localhost:${MAUBOT_PUERTO_HOST:-29317}/_matrix/maubot       -"
+  echo "Doxygen     http://localhost:8005                                               -"
+  echo "Mapeo API   http://mapeo-api:8000                                               (Solo red interna Docker. Token: ${MAPEO_API_TOKEN})"
   
   cd "${ROOT_DIR}/moodle-matrix-dev" || true
   if docker compose ps --services --filter "status=running" 2>/dev/null | grep -q "ollama"; then
