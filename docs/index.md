@@ -9,7 +9,7 @@ Sistema integrado de docencia Moodle-Matrix-GitHub.
 - **Maubot (LLM Wiki Assistant)**: Agente LLM que atiende consultas basándose exclusivamente en el repositorio asignado a la sala.
 
 ## Fases de Implementación y Resumen de Estado
-Puedes consultar el histórico detallado y las pruebas en el \subpage resumen_fases.
+Puedes consultar el histórico detallado y las pruebas en el \subpage resumen_fases. Adicionalmente, si eres un asistente basado en LLM integrándose al proyecto, lee de forma obligatoria el \subpage contexto_ia.
 
 | Fase | Descripción | Estado |
 |---|---|---|
