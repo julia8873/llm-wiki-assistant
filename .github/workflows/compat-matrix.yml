@@ -16,6 +16,6 @@ jobs:
         uses: peter-evans/repository-dispatch@v2
         with:
           token: ${{ secrets.PAT_TOKEN }}
-          repository: CEPRUD/bdc-trazabilidad
+          repository: julia8873/bdc-trazabilidad
           event-type: cross-repo-test
           client-payload: '{"version": "${{ github.sha }}"}'
