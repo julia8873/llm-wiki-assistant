@@ -1,0 +1,21 @@
+name: Compatibility Matrix Trigger
+
+on:
+  push:
+    paths:
+      - 'shared-pkg/**'
+  pull_request:
+    paths:
+      - 'shared-pkg/**'
+
+jobs:
+  trigger-consumer-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger bdc-trazabilidad CI
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ secrets.PAT_TOKEN }}
+          repository: CEPRUD/bdc-trazabilidad
+          event-type: cross-repo-test
+          client-payload: '{"version": "${{ github.sha }}"}'
