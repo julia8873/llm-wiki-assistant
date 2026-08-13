@@ -94,6 +94,9 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - default
+      - bdc-net
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:${MAPEO_API_PUERTO_CONTENEDOR}/health"]
       interval: 10s
@@ -107,6 +110,9 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
+    networks:
+      - default
+      - bdc-net
     volumes:
       - postgres_api_data:/var/lib/postgresql/data
     healthcheck:
@@ -169,6 +175,9 @@ services:
     command: ["redis-server", "--appendonly", "yes"]
     ports:
       - "6379:6379"
+    networks:
+      - default
+      - bdc-net
     volumes:
       - redis_data:/data
     healthcheck:
@@ -249,3 +258,7 @@ volumes:
   postgres_api_data:
   pgvector_data:
   redis_data:
+
+networks:
+  bdc-net:
+    external: true

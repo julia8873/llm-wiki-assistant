@@ -1,0 +1,31 @@
+name: Deploy Reusable Workflow
+
+on:
+  workflow_call:
+    inputs:
+      service_name:
+        required: true
+        type: string
+        description: 'Nombre del servicio a desplegar'
+      compose_file:
+        required: true
+        type: string
+        description: 'Ruta al fichero docker-compose a utilizar'
+      healthcheck_endpoint:
+        required: true
+        type: string
+        description: 'Endpoint HTTP o comando para verificar la salud'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Simular despliegue
+        run: |
+          echo "Desplegando servicio: ${{ inputs.service_name }}"
+          echo "Usando compose: ${{ inputs.compose_file }}"
+          echo "Verificando salud contra: ${{ inputs.healthcheck_endpoint }}"
+          echo "Despliegue simulado exitoso."
