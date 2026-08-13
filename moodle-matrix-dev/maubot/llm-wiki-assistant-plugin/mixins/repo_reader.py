@@ -8,6 +8,7 @@ from typing import Dict, Any, List
 import pypdf
 from .vector_store import VectorStore
 from .llm_clients import LLMClient
+from shared_pkg.okf_contract import COMMIT_MSG_INGEST, COMMIT_MSG_REVERT
 
 logger = logging.getLogger("llm_wiki.repo_reader")
 
@@ -281,7 +282,7 @@ class RepoReader:
         await self._run_git_command('git config user.email "bot@llm-wiki.com"', local_path)
         await self._run_git_command('git config user.name "LLM Wiki Bot"', local_path)
         try:
-            await self._run_git_command(f'git commit -m "Ingesta automatica de conceptos desde {filename}"', local_path)
+            await self._run_git_command(f'git commit -m "{COMMIT_MSG_INGEST} desde {filename}"', local_path)
             await self._run_git_command("git push", local_path)
         except Exception as e:
             if "nothing to commit" not in str(e).lower():
@@ -317,7 +318,7 @@ class RepoReader:
             logger.error(f"Error comprobando ultimo commit: {e}")
             raise RepoReaderError("No se pudo leer el historial del repositorio.")
             
-        if "Ingesta automatica de conceptos" not in last_commit_msg:
+        if COMMIT_MSG_INGEST not in last_commit_msg:
             return False # No era una ingesta automatica
             
         # Extraer que ficheros se van a borrar
@@ -358,7 +359,7 @@ class RepoReader:
         await self._run_git_command(f"git add {log_repo_path}", local_path)
         await self._run_git_command('git config user.email "bot@llm-wiki.com"', local_path)
         await self._run_git_command('git config user.name "LLM Wiki Bot"', local_path)
-        await self._run_git_command('git commit -m "Reversion automatica de la ultima ingesta"', local_path)
+        await self._run_git_command(f'git commit -m "{COMMIT_MSG_REVERT}"', local_path)
         await self._run_git_command("git push", local_path)
         
         return True

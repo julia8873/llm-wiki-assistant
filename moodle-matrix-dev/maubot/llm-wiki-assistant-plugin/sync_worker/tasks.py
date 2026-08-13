@@ -7,6 +7,7 @@ import asyncio
 import logging
 import httpx
 from git_utils import asegurar_repo_local, run_git_command, asegurar_estructura_okf, distributed_repo_lock
+from shared_pkg.okf_contract import COMMIT_MSG_SYNC, PATH_LOG_INTERACCIONES
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +86,7 @@ async def _async_sync_repo_task(matrix_room_id: str, repo_alumno_url: str, offic
             code, out, err = await run_git_command('add', 'material-oficial/', cwd=destino_local)
             code, out, err = await run_git_command('add', 'logs/log.txt', cwd=destino_local)
             
-            code, out, err = await run_git_command('commit', '-m', 'Sincronización automática completa de material oficial', cwd=destino_local)
+            code, out, err = await run_git_command('commit', '-m', COMMIT_MSG_SYNC, cwd=destino_local)
             if code != 0:
                 logger.info("Nada que commitear o no hay cambios.")
                 return
@@ -177,12 +178,12 @@ async def _async_log_interaction_task(matrix_room_id: str, repo_alumno_url: str,
         async with distributed_repo_lock(destino_local):
             await asegurar_repo_local(repo_alumno_url, official_repo_url, destino_local)
             
-            interacciones_dir = os.path.join(destino_local, "logs", "interacciones")
+            interacciones_dir = os.path.join(destino_local, PATH_LOG_INTERACCIONES)
             os.makedirs(interacciones_dir, exist_ok=True)
             
             # Formato de archivo: logs/interacciones/YYYY-MM-DD.jsonl
             fecha = datetime.datetime.now().strftime("%Y-%m-%d")
-            log_path = os.path.join(interacciones_dir, f"{fecha}.jsonl")
+            log_path = os.path.join(destino_local, PATH_LOG_INTERACCIONES, f"{fecha}.jsonl")
             
             # Serializar la entrada para hacer el append
             line_str = json.dumps(log_data, ensure_ascii=False)
@@ -203,7 +204,7 @@ async def _async_log_interaction_task(matrix_room_id: str, repo_alumno_url: str,
                 with open(log_path, "a", encoding="utf-8") as f:
                     f.write(line_str + "\n")
                 
-                await run_git_command('add', f'logs/interacciones/{fecha}.jsonl', cwd=destino_local)
+                await run_git_command('add', f'{PATH_LOG_INTERACCIONES}/{fecha}.jsonl', cwd=destino_local)
                 code, out, err = await run_git_command('commit', '-m', f'Log interacción {log_data.get("timestamp", "")}', cwd=destino_local)
                 if code != 0:
                     logger.warning(f"Git commit omitido (sin cambios): {err}")

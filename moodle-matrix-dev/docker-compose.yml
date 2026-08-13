@@ -131,11 +131,13 @@ services:
       - GITHUB_PAT=${GITHUB_PAT}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - PYTHONPATH=/shared-pkg
     ports:
       - "${MAUBOT_PUERTO_HOST}:${MAUBOT_PUERTO_CONTENEDOR}"
     volumes:
       - ./maubot:/data
       - ../config:/config:ro
+      - ../shared-pkg:/shared-pkg:ro
     depends_on:
       synapse:
         condition: service_healthy
@@ -198,10 +200,11 @@ services:
       - GITHUB_PAT=${GITHUB_PAT}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - PYTHONPATH=/data/llm-wiki-assistant-plugin
+      - PYTHONPATH=/data/llm-wiki-assistant-plugin:/shared-pkg
     volumes:
       - ./maubot:/data
       - ../config:/config:ro
+      - ../shared-pkg:/shared-pkg:ro
     depends_on:
       redis:
         condition: service_healthy
@@ -218,10 +221,11 @@ services:
       - GITHUB_PAT=${GITHUB_PAT}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - PYTHONPATH=/data/llm-wiki-assistant-plugin
+      - PYTHONPATH=/data/llm-wiki-assistant-plugin:/shared-pkg
     volumes:
       - ./maubot:/data
       - ../config:/config:ro
+      - ../shared-pkg:/shared-pkg:ro
     depends_on:
       redis:
         condition: service_healthy

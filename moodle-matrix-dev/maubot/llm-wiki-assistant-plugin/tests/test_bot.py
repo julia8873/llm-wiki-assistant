@@ -5,7 +5,7 @@ from unittest.mock import patch, MagicMock, AsyncMock
 from mixins.mapeo_client import MapeoClient, MapeoClientError
 from mixins.repo_reader import RepoReader
 from mixins.vector_store import VectorStore
-from bot import LLMWikiAssistantPlugin
+from assistant import LLMWikiAssistantPlugin
 
 @pytest.fixture
 def mock_mapeo_client():
