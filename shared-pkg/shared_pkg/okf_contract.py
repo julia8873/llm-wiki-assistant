@@ -9,7 +9,7 @@ estas cadenas.
 OKF_CONTRACT_VERSION = "1.0.0"
 
 # Mensajes de commit generados automáticamente por el bot
-COMMIT_MSG_INGEST = "Ingesta automatizada de conceptos"
+COMMIT_MSG_INGEST = "Ingesta automatica de conceptos"
 COMMIT_MSG_REVERT = "Reversion automatica de la ultima ingesta"
 COMMIT_MSG_SYNC = "Sincronización automática completa de material oficial"
 
