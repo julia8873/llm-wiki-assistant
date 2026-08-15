@@ -78,3 +78,27 @@ def test_same_user_different_courses(client: TestClient):
         "matrix_room_id": "room3"
     }, headers=headers)
     assert response.status_code == 409
+
+def test_read_moodle_username_filter(client: TestClient):
+    headers = {"Authorization": "Bearer test_token"}
+    client.post("/mapeos", json={
+        "moodle_user_id": 100,
+        "moodle_course_id": 1,
+        "repo_url": "url",
+        "matrix_room_id": "room_a",
+        "moodle_username": "student_alpha"
+    }, headers=headers)
+    
+    client.post("/mapeos", json={
+        "moodle_user_id": 101,
+        "moodle_course_id": 1,
+        "repo_url": "url",
+        "matrix_room_id": "room_b",
+        "moodle_username": "student_beta"
+    }, headers=headers)
+
+    response = client.get("/mapeos?moodle_username=student_alpha", headers=headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["moodle_username"] == "student_alpha"

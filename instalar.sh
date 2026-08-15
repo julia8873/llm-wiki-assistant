@@ -679,7 +679,7 @@ cmd_test() {
   docker exec moodle-matrix-dev-mapeo-api-1 alembic upgrade head || api_fail=1
   # Copy tests into the container since they are not mounted by default
   docker cp "${ROOT_DIR}/moodle-matrix-dev/mapeo-api/tests" moodle-matrix-dev-mapeo-api-1:/code/tests
-  docker exec moodle-matrix-dev-mapeo-api-1 pytest /code/tests || api_fail=1
+  docker exec moodle-matrix-dev-mapeo-api-1 bash -c "PYTHONPATH=/code pytest -v /code/tests" || api_fail=1
   if [[ "$api_fail" -eq 0 ]]; then
     res_api="[ PASA  ]"
   else
@@ -716,7 +716,7 @@ cmd_test() {
 
   # d. Tests Python del bot / worker (Fases 5, 5.1, 6)
   info "--- Ejecutando bloque D: Bot / Worker (pytest) ---"
-  if docker exec moodle-matrix-dev-sync-worker-1 bash -c "cd /data/llm-wiki-assistant-plugin && pytest tests/"; then
+  if docker exec moodle-matrix-dev-sync-worker-1 sh -c "cd /data/llm-wiki-assistant-plugin && pytest -v tests/"; then
     res_worker="[ PASA  ]"
   else
     warn "Fallo en el bloque de Worker/Bot (pytest)."

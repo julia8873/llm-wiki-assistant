@@ -26,6 +26,12 @@ $mapeo_client = new block_bdc_mapeo_client();
 
 $is_teacher = has_capability('moodle/course:update', $context) || has_capability('moodle/course:viewhiddenactivities', $context) || has_capability('moodle/grade:edit', $context);
 
+if ($is_teacher) {
+    // Sincronizar todos los alumnos matriculados
+    $enrolled_users = get_enrolled_users($context, 'moodle/course:participate');
+    $mapeo_client->sync_course_roster($courseid, $enrolled_users, $course->shortname);
+}
+
 // 1. Comprobación rápida sin bloqueo
 $mapeo = $mapeo_client->get_mapeo($userid, $courseid);
 

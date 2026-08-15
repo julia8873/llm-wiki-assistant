@@ -16,10 +16,11 @@ class RepoReaderError(Exception):
     pass
 
 class RepoReader:
-    def __init__(self, config: Dict[str, Any], vector_store: VectorStore, llm_client: LLMClient):
+    def __init__(self, config: Dict[str, Any], vector_store: VectorStore, llm_client: LLMClient, mapeo_client=None):
         self.config = config
         self.vector_store = vector_store
         self.llm_client = llm_client
+        self.mapeo_client = mapeo_client
         self.repos_dir = "/tmp/llm_wiki_repos"
         os.makedirs(self.repos_dir, exist_ok=True)
         
@@ -284,6 +285,17 @@ class RepoReader:
         try:
             await self._run_git_command(f'git commit -m "{COMMIT_MSG_INGEST} desde {filename}"', local_path)
             await self._run_git_command("git push", local_path)
+            
+            # Post evento
+            commit_sha = (await self._run_git_command("git rev-parse HEAD", local_path)).strip()
+            if self.mapeo_client:
+                matrix_room_id = mapeo_data.get("matrix_room_id")
+                await self.mapeo_client.post_evento(
+                    matrix_room_id=matrix_room_id,
+                    commit_sha=commit_sha,
+                    tipo_evento="INGEST",
+                    timestamp_str=datetime.utcnow().isoformat() + "Z"
+                )
         except Exception as e:
             if "nothing to commit" not in str(e).lower():
                 raise
@@ -361,6 +373,17 @@ class RepoReader:
         await self._run_git_command('git config user.name "LLM Wiki Bot"', local_path)
         await self._run_git_command(f'git commit -m "{COMMIT_MSG_REVERT}"', local_path)
         await self._run_git_command("git push", local_path)
+        
+        # Post evento
+        commit_sha = (await self._run_git_command("git rev-parse HEAD", local_path)).strip()
+        if self.mapeo_client:
+            matrix_room_id = mapeo_data.get("matrix_room_id")
+            await self.mapeo_client.post_evento(
+                matrix_room_id=matrix_room_id,
+                commit_sha=commit_sha,
+                tipo_evento="REVERT",
+                timestamp_str=datetime.utcnow().isoformat() + "Z"
+            )
         
         return True
                 

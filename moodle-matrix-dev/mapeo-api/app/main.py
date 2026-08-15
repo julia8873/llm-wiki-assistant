@@ -17,8 +17,8 @@ from fastapi import Request
 import redis
 from rq import Queue, Retry
 
-from .models import MapeoCreate, MapeoRead, MapeoEstado, CursoCreate
-from .db import create_db_and_tables, get_session, MapeoDB
+from .models import MapeoCreate, MapeoRead, MapeoEstado, CursoCreate, EventoCreate, EventoRead, SyncRoster
+from .db import create_db_and_tables, get_session, MapeoDB, EventosBotDB
 from .services.git import get_git_provider, GitProviderConfigError
 
 app = FastAPI(title="Mapeo API", description="API centralizada para la relación Alumno-Curso-Fork-Sala")
@@ -157,9 +157,11 @@ def read_mapeos(
     moodle_user_id: Optional[int] = None,
     moodle_course_id: Optional[int] = None,
     matrix_room_id: Optional[str] = None,
+    moodle_username: Optional[str] = None,
     session: Session = Depends(get_session),
     token: str = Depends(verify_token)
 ):
+    print(f"DEBUG: moodle_user_id={moodle_user_id}, moodle_username={moodle_username}")
     query = session.query(MapeoDB)
     if moodle_user_id is not None:
         query = query.filter(MapeoDB.moodle_user_id == moodle_user_id)
@@ -167,6 +169,8 @@ def read_mapeos(
         query = query.filter(MapeoDB.moodle_course_id == moodle_course_id)
     if matrix_room_id is not None:
         query = query.filter(MapeoDB.matrix_room_id == matrix_room_id)
+    if moodle_username is not None:
+        query = query.filter(MapeoDB.moodle_username == moodle_username)
     
     results = query.all()
     
@@ -174,6 +178,35 @@ def read_mapeos(
         raise HTTPException(status_code=404, detail="Mapeo no encontrado")
         
     return results
+
+@app.post("/mapeos/sync-roster", status_code=status.HTTP_200_OK)
+def sync_roster(
+    roster: SyncRoster,
+    session: Session = Depends(get_session),
+    token: str = Depends(verify_token)
+):
+    """Sincroniza la lista de alumnos de un curso."""
+    course_id = roster.moodle_course_id
+    
+    for student in roster.students:
+        # Check si ya existe
+        existing = session.query(MapeoDB).filter(
+            MapeoDB.moodle_user_id == student.moodle_user_id,
+            MapeoDB.moodle_course_id == course_id
+        ).first()
+        
+        if not existing:
+            new_mapeo = MapeoDB(
+                moodle_user_id=student.moodle_user_id,
+                moodle_course_id=course_id,
+                estado=MapeoEstado.PENDIENTE_GITHUB,
+                is_teacher=1 if student.is_teacher else 0,
+                moodle_username=student.moodle_username
+            )
+            session.add(new_mapeo)
+    
+    session.commit()
+    return {"status": "ok"}
 
 @app.get("/mapeos/by-room/{matrix_room_id}", response_model=MapeoRead)
 def get_by_room(matrix_room_id: str, session: Session = Depends(get_session), token: str = Depends(verify_token)):
@@ -266,3 +299,37 @@ async def sync_webhook(request: Request, session: Session = Depends(get_session)
             enqueued += 1
 
     return {"status": "ok", "enqueued_jobs": enqueued}
+
+
+@app.post("/eventos", response_model=EventoRead, status_code=status.HTTP_201_CREATED)
+async def create_evento(evento: EventoCreate, session: Session = Depends(get_session), token: str = Depends(verify_token)):
+    db_evento = EventosBotDB(
+        matrix_room_id=evento.matrix_room_id,
+        commit_sha=evento.commit_sha,
+        tipo_evento=evento.tipo_evento,
+        timestamp=evento.timestamp
+    )
+    
+    try:
+        session.add(db_evento)
+        session.commit()
+        session.refresh(db_evento)
+    except IntegrityError:
+        session.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="El evento con este commit_sha ya existe."
+        )
+
+    return db_evento
+
+
+@app.get("/eventos-recientes", response_model=List[EventoRead])
+def read_eventos_recientes(
+    limit: int = 100,
+    session: Session = Depends(get_session),
+    token: str = Depends(verify_token)
+):
+    """Devuelve los eventos más recientes."""
+    results = session.query(EventosBotDB).order_by(EventosBotDB.created_at.desc()).limit(limit).all()
+    return results

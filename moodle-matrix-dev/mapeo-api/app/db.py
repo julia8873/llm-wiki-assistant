@@ -42,6 +42,20 @@ class MapeoDB(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+class EventosBotDB(Base):
+    """!
+    @brief Modelo ORM para la tabla 'eventos_bot'.
+    @details Registra los eventos que el bot produce y envía al feed.
+    """
+    __tablename__ = "eventos_bot"
+
+    id = Column(Integer, primary_key=True, index=True)
+    matrix_room_id = Column(String, nullable=False, index=True)
+    commit_sha = Column(String, nullable=False, unique=True, index=True)
+    tipo_evento = Column(String, nullable=False)
+    timestamp = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
 def create_db_and_tables():
     if "sqlite:////data" in DATABASE_URL:
         os.makedirs("/data", exist_ok=True)

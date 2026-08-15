@@ -12,6 +12,7 @@ OKF_CONTRACT_VERSION = "1.0.0"
 COMMIT_MSG_INGEST = "Ingesta automatica de conceptos"
 COMMIT_MSG_REVERT = "Reversion automatica de la ultima ingesta"
 COMMIT_MSG_SYNC = "Sincronización automática completa de material oficial"
+COMMIT_MSG_LOG = "Log interacción"
 
 # Rutas estándar del formato OKF
 PATH_LOG_INTERACCIONES = "logs/interacciones"

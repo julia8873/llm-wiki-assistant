@@ -15,7 +15,7 @@ Sistema integrado de docencia Moodle-Matrix-Git. Proporciona a cada estudiante u
 - [Funcionalidades del Bot en Matrix (OKF v0.1)](#funcionalidades_bot)
 - [Credenciales de Prueba](#credenciales_prueba)
 - [Inventario de Componentes y Carpetas Clave](#inventario_componentes)
-- [Fases de Implementación y Estado](#fases_implementacion)
+- [Fases de Implementación y Estado](docs/resumen-fases.md)
 
 ## Guía de Instalación y Puesta en Marcha {#paso_a_paso}
 

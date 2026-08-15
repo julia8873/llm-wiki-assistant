@@ -40,6 +40,16 @@ class MapeoCreate(MapeoBase):
     moodle_username: str = ""
     moodle_course_shortname: str = ""
 
+class SyncStudent(BaseModel):
+    moodle_user_id: int
+    moodle_username: str
+    is_teacher: bool = False
+
+class SyncRoster(BaseModel):
+    moodle_course_id: int
+    moodle_course_shortname: str
+    students: list[SyncStudent]
+
 class MapeoRead(MapeoBase):
     """!
     @brief Modelo de respuesta HTTP tras la creación o consulta de mapeos.
@@ -55,3 +65,15 @@ class CursoCreate(BaseModel):
     @brief Modelo para la provisión del repositorio oficial de un curso.
     """
     moodle_course_shortname: str
+
+class EventoCreate(BaseModel):
+    matrix_room_id: str
+    commit_sha: str
+    tipo_evento: str
+    timestamp: str
+
+class EventoRead(EventoCreate):
+    id: int
+    created_at: datetime
+    
+    model_config = ConfigDict(from_attributes=True)

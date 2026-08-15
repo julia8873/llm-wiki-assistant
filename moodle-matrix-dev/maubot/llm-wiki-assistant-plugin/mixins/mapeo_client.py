@@ -46,3 +46,36 @@ class MapeoClient:
                 if isinstance(e, MapeoClientError):
                     raise
                 raise MapeoClientError(f"Error de conexión con Mapeo API: {str(e)}")
+
+    import tenacity
+    @tenacity.retry(stop=tenacity.stop_after_attempt(3), wait=tenacity.wait_exponential(multiplier=1, min=2, max=10))
+    async def post_evento(self, matrix_room_id: str, commit_sha: str, tipo_evento: str, timestamp_str: str) -> None:
+        """
+        Envía un evento producido por el bot a mapeo-api.
+        Usa tenacity para reintentos en caso de fallos transitorios.
+        """
+        headers = {}
+        if self.token:
+            headers["Authorization"] = f"Bearer {self.token}"
+            
+        payload = {
+            "matrix_room_id": matrix_room_id,
+            "commit_sha": commit_sha,
+            "tipo_evento": tipo_evento,
+            "timestamp": timestamp_str
+        }
+        
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            try:
+                url = f"{self.api_url}/eventos"
+                response = await client.post(url, headers=headers, json=payload)
+                response.raise_for_status()
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 409:
+                    logger.info(f"Evento {commit_sha} ya existía en mapeo-api")
+                    return
+                logger.error(f"Error HTTP al postear evento a mapeo-api: {e.response.status_code} {e.response.text}")
+                raise
+            except Exception as e:
+                logger.error(f"Error de conexión al postear evento: {e}")
+                raise

@@ -7,7 +7,15 @@ import asyncio
 import logging
 import httpx
 from git_utils import asegurar_repo_local, run_git_command, asegurar_estructura_okf, distributed_repo_lock
-from shared_pkg.okf_contract import COMMIT_MSG_SYNC, PATH_LOG_INTERACCIONES
+from shared_pkg.okf_contract import COMMIT_MSG_SYNC, PATH_LOG_INTERACCIONES, COMMIT_MSG_LOG
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+from mixins.mapeo_client import MapeoClient
+
+def get_mapeo_client():
+    token = os.environ.get("MAPEO_API_TOKEN", "")
+    url = os.environ.get("MAPEO_API_URL", "http://mapeo-api:8000")
+    return MapeoClient(url, token)
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +103,21 @@ async def _async_sync_repo_task(matrix_room_id: str, repo_alumno_url: str, offic
             code, out, err = await run_git_command('push', 'origin', 'main', cwd=destino_local)
             if code != 0:
                 raise RuntimeError(f"Error en git push: {err}")
+                
+            code, out, err = await run_git_command('rev-parse', 'HEAD', cwd=destino_local)
+            commit_sha = out.strip()
+            
+            # Post evento
+            try:
+                client = get_mapeo_client()
+                await client.post_evento(
+                    matrix_room_id=matrix_room_id,
+                    commit_sha=commit_sha,
+                    tipo_evento="SYNC",
+                    timestamp_str=datetime.datetime.utcnow().isoformat() + "Z"
+                )
+            except Exception as e:
+                logger.error(f"Error posteando evento SYNC a mapeo-api: {e}")
 
             logger.info(f"Sync completado con éxito para {matrix_room_id}")
 
@@ -205,7 +228,7 @@ async def _async_log_interaction_task(matrix_room_id: str, repo_alumno_url: str,
                     f.write(line_str + "\n")
                 
                 await run_git_command('add', f'{PATH_LOG_INTERACCIONES}/{fecha}.jsonl', cwd=destino_local)
-                code, out, err = await run_git_command('commit', '-m', f'Log interacción {log_data.get("timestamp", "")}', cwd=destino_local)
+                code, out, err = await run_git_command('commit', '-m', f'{COMMIT_MSG_LOG} {log_data.get("timestamp", "")}', cwd=destino_local)
                 if code != 0:
                     logger.warning(f"Git commit omitido (sin cambios): {err}")
             else:
@@ -215,6 +238,29 @@ async def _async_log_interaction_task(matrix_room_id: str, repo_alumno_url: str,
             code, out, err = await run_git_command('push', 'origin', 'main', cwd=destino_local)
             if code != 0:
                 raise RuntimeError(f"Error en git push de logs: {err}")
+                
+            code, out, err = await run_git_command('rev-parse', 'HEAD', cwd=destino_local)
+            commit_sha = out.strip()
+            
+            # Escribir payload con commit_sha en un buffer local para backfill (fuera de git)
+            backfill_payload = log_data.copy()
+            backfill_payload["commit_sha"] = commit_sha
+            backfill_payload["matrix_room_id"] = matrix_room_id
+            backfill_path = os.path.join(destino_local, ".backfill.jsonl")
+            with open(backfill_path, "a", encoding="utf-8") as bf:
+                bf.write(json.dumps(backfill_payload, ensure_ascii=False) + "\n")
+
+            # Post evento
+            try:
+                client = get_mapeo_client()
+                await client.post_evento(
+                    matrix_room_id=matrix_room_id,
+                    commit_sha=commit_sha,
+                    tipo_evento="INTERACTION",
+                    timestamp_str=datetime.datetime.utcnow().isoformat() + "Z"
+                )
+            except Exception as e:
+                logger.error(f"Error posteando evento INTERACTION a mapeo-api: {e}")
                 
             logger.info("Log de interacciones completado exitosamente.")
             

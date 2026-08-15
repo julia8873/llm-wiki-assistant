@@ -136,6 +136,14 @@ async def asegurar_repo_local(repo_alumno_url: str, official_repo_url: Optional[
     await run_git_command('config', 'user.name', 'LLM Wiki Assistant', cwd=destino_local)
     await run_git_command('config', 'user.email', 'bot@llm-wiki', cwd=destino_local)
 
+    # Ignorar buffer de backfill
+    exclude_path = os.path.join(destino_local, '.git', 'info', 'exclude')
+    if os.path.exists(os.path.dirname(exclude_path)):
+        with open(exclude_path, 'a+') as f:
+            f.seek(0)
+            if '.backfill.jsonl' not in f.read():
+                f.write('\n.backfill.jsonl\n')
+
     # 2. Configurar remote upstream
     if official_repo_url:
         if pat and official_repo_url.startswith("https://"):

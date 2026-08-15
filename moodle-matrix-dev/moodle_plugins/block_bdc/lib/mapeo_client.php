@@ -103,4 +103,40 @@ class block_bdc_mapeo_client {
         
         return json_decode($response, true);
     }
+
+    /**
+     * Sincroniza la lista de alumnos matriculados con mapeo-api.
+     *
+     * @param int $courseid ID del curso en Moodle
+     * @param array $students Array de objetos de usuario de Moodle
+     * @param string $course_shortname Nombre corto del curso
+     */
+    public function sync_course_roster($courseid, $students, $course_shortname) {
+        $curl = new \curl(['ignoresecurity' => true]);
+        $curl->setHeader('Authorization: Bearer ' . $this->token);
+        $curl->setHeader('Content-Type: application/json');
+
+        $roster = [];
+        foreach ($students as $student) {
+            $roster[] = [
+                'moodle_user_id' => (int)$student->id,
+                'moodle_username' => $student->username,
+                'is_teacher' => false
+            ];
+        }
+
+        $payload = json_encode([
+            'moodle_course_id' => (int)$courseid,
+            'moodle_course_shortname' => $course_shortname,
+            'students' => $roster
+        ]);
+
+        $url = $this->baseurl . '/mapeos/sync-roster';
+        $response = $curl->post($url, $payload);
+        $status = $curl->get_info()['http_code'];
+
+        if ($status !== 200 && $status !== 201) {
+            error_log("BLOCK_BDC SYNC ERROR: No se pudo sincronizar roster. Status: $status. Resp: $response");
+        }
+    }
 }
