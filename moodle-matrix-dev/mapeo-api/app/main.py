@@ -21,7 +21,33 @@ from .models import MapeoCreate, MapeoRead, MapeoEstado, CursoCreate, EventoCrea
 from .db import create_db_and_tables, get_session, MapeoDB, EventosBotDB
 from .services.git import get_git_provider, GitProviderConfigError
 
-app = FastAPI(title="Mapeo API", description="API centralizada para la relación Alumno-Curso-Fork-Sala")
+app = FastAPI(title="Mapeo API", description="API centralizada para la relación Alumno-Curso-Fork-Sala", docs_url=None if os.getenv("ENVIRONMENT") == "production" else "/docs", redoc_url=None if os.getenv("ENVIRONMENT") == "production" else "/redoc", openapi_url=None if os.getenv("ENVIRONMENT") == "production" else "/openapi.json")
+
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"type": "about:blank", "title": "HTTP Error", "status": exc.status_code, "detail": str(exc.detail), "instance": request.url.path}
+    )
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=422,
+        content={"type": "about:blank", "title": "Validation Error", "status": 422, "detail": str(exc.errors()), "instance": request.url.path}
+    )
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    return JSONResponse(
+        status_code=500,
+        content={"type": "about:blank", "title": "Internal Server Error", "status": 500, "detail": "Ocurrió un error inesperado", "instance": request.url.path}
+    )
+
 
 # RQ Setup
 redis_conn = redis.Redis(host='redis', port=6379)
@@ -48,12 +74,20 @@ def on_startup():
         raise RuntimeError("FATAL: MAPEO_API_TOKEN no está configurado correctamente. Revisa tu fichero .env.")
     create_db_and_tables()
 
-@app.get("/health", status_code=200)
-def health_check():
+@app.get("/v1/health", status_code=200)
+@app.get("/health", status_code=200, deprecated=True)
+def health_check(response: Response, request: Request, ):
+    if not request.url.path.startswith("/v1/"):
+        response.headers["Sunset"] = "Wed, 18 Feb 2027 00:00:00 GMT"
+
     return {"status": "ok"}
 
-@app.post("/mapeos", response_model=MapeoRead, status_code=status.HTTP_201_CREATED)
-async def create_mapeo(mapeo: MapeoCreate, session: Session = Depends(get_session), token: str = Depends(verify_token)):
+@app.post("/v1/mapeos", response_model=MapeoRead, status_code=status.HTTP_201_CREATED)
+@app.post("/mapeos", response_model=MapeoRead, status_code=status.HTTP_201_CREATED, deprecated=True)
+async def create_mapeo(response: Response, request: Request, mapeo: MapeoCreate, session: Session = Depends(get_session), token: str = Depends(verify_token)):
+    if not request.url.path.startswith("/v1/"):
+        response.headers["Sunset"] = "Wed, 18 Feb 2027 00:00:00 GMT"
+
     """!
     @brief Crea un nuevo mapeo y aprovisiona el repositorio en GitHub/GitLab/Gitea.
     @details
@@ -152,8 +186,9 @@ async def create_mapeo(mapeo: MapeoCreate, session: Session = Depends(get_sessio
 
     return db_mapeo
 
-@app.get("/mapeos", response_model=List[MapeoRead])
-def read_mapeos(
+@app.get("/v1/mapeos", response_model=List[MapeoRead])
+@app.get("/mapeos", response_model=List[MapeoRead], deprecated=True)
+def read_mapeos(response: Response, request: Request, 
     moodle_user_id: Optional[int] = None,
     moodle_course_id: Optional[int] = None,
     matrix_room_id: Optional[str] = None,
@@ -161,6 +196,9 @@ def read_mapeos(
     session: Session = Depends(get_session),
     token: str = Depends(verify_token)
 ):
+    if not request.url.path.startswith("/v1/"):
+        response.headers["Sunset"] = "Wed, 18 Feb 2027 00:00:00 GMT"
+
     print(f"DEBUG: moodle_user_id={moodle_user_id}, moodle_username={moodle_username}")
     query = session.query(MapeoDB)
     if moodle_user_id is not None:
@@ -179,12 +217,16 @@ def read_mapeos(
         
     return results
 
-@app.post("/mapeos/sync-roster", status_code=status.HTTP_200_OK)
-def sync_roster(
+@app.post("/v1/mapeos/sync-roster", status_code=status.HTTP_200_OK)
+@app.post("/mapeos/sync-roster", status_code=status.HTTP_200_OK, deprecated=True)
+def sync_roster(response: Response, request: Request, 
     roster: SyncRoster,
     session: Session = Depends(get_session),
     token: str = Depends(verify_token)
 ):
+    if not request.url.path.startswith("/v1/"):
+        response.headers["Sunset"] = "Wed, 18 Feb 2027 00:00:00 GMT"
+
     """Sincroniza la lista de alumnos de un curso."""
     course_id = roster.moodle_course_id
     
@@ -208,15 +250,23 @@ def sync_roster(
     session.commit()
     return {"status": "ok"}
 
-@app.get("/mapeos/by-room/{matrix_room_id}", response_model=MapeoRead)
-def get_by_room(matrix_room_id: str, session: Session = Depends(get_session), token: str = Depends(verify_token)):
+@app.get("/v1/mapeos/by-room/{matrix_room_id}", response_model=MapeoRead)
+@app.get("/mapeos/by-room/{matrix_room_id}", response_model=MapeoRead, deprecated=True)
+def get_by_room(response: Response, request: Request, matrix_room_id: str, session: Session = Depends(get_session), token: str = Depends(verify_token)):
+    if not request.url.path.startswith("/v1/"):
+        response.headers["Sunset"] = "Wed, 18 Feb 2027 00:00:00 GMT"
+
     result = session.query(MapeoDB).filter(MapeoDB.matrix_room_id == matrix_room_id).first()
     if not result:
         raise HTTPException(status_code=404, detail="Mapeo no encontrado para esta sala")
     return result
 
-@app.post("/cursos", status_code=status.HTTP_201_CREATED)
-async def create_curso(curso: CursoCreate, token: str = Depends(verify_token)):
+@app.post("/v1/cursos", status_code=status.HTTP_201_CREATED)
+@app.post("/cursos", status_code=status.HTTP_201_CREATED, deprecated=True)
+async def create_curso(response: Response, request: Request, curso: CursoCreate, token: str = Depends(verify_token)):
+    if not request.url.path.startswith("/v1/"):
+        response.headers["Sunset"] = "Wed, 18 Feb 2027 00:00:00 GMT"
+
     """!
     @brief Aprovisiona la plantilla oficial del curso en el proveedor Git.
     @details
@@ -238,8 +288,12 @@ async def create_curso(curso: CursoCreate, token: str = Depends(verify_token)):
         )
 
 
-@app.post("/sync/oficial-updated")
-async def sync_webhook(request: Request, session: Session = Depends(get_session)):
+@app.post("/v1/sync/oficial-updated")
+@app.post("/sync/oficial-updated", deprecated=True)
+async def sync_webhook(response: Response, request: Request, session: Session = Depends(get_session)):
+    if not request.url.path.startswith("/v1/"):
+        response.headers["Sunset"] = "Wed, 18 Feb 2027 00:00:00 GMT"
+
     # 1. Verificar firma HMAC
     secret = os.getenv("GITHUB_WEBHOOK_SECRET")
     if not secret:
@@ -301,8 +355,12 @@ async def sync_webhook(request: Request, session: Session = Depends(get_session)
     return {"status": "ok", "enqueued_jobs": enqueued}
 
 
-@app.post("/eventos", response_model=EventoRead, status_code=status.HTTP_201_CREATED)
-async def create_evento(evento: EventoCreate, session: Session = Depends(get_session), token: str = Depends(verify_token)):
+@app.post("/v1/eventos", response_model=EventoRead, status_code=status.HTTP_201_CREATED)
+@app.post("/eventos", response_model=EventoRead, status_code=status.HTTP_201_CREATED, deprecated=True)
+async def create_evento(response: Response, request: Request, evento: EventoCreate, session: Session = Depends(get_session), token: str = Depends(verify_token)):
+    if not request.url.path.startswith("/v1/"):
+        response.headers["Sunset"] = "Wed, 18 Feb 2027 00:00:00 GMT"
+
     db_evento = EventosBotDB(
         matrix_room_id=evento.matrix_room_id,
         commit_sha=evento.commit_sha,
@@ -324,12 +382,16 @@ async def create_evento(evento: EventoCreate, session: Session = Depends(get_ses
     return db_evento
 
 
-@app.get("/eventos-recientes", response_model=List[EventoRead])
-def read_eventos_recientes(
+@app.get("/v1/eventos-recientes", response_model=List[EventoRead])
+@app.get("/eventos-recientes", response_model=List[EventoRead], deprecated=True)
+def read_eventos_recientes(response: Response, request: Request, 
     limit: int = 100,
     session: Session = Depends(get_session),
     token: str = Depends(verify_token)
 ):
+    if not request.url.path.startswith("/v1/"):
+        response.headers["Sunset"] = "Wed, 18 Feb 2027 00:00:00 GMT"
+
     """Devuelve los eventos más recientes."""
     results = session.query(EventosBotDB).order_by(EventosBotDB.created_at.desc()).limit(limit).all()
     return results

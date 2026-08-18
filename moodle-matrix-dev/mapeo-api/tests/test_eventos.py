@@ -14,13 +14,24 @@ def override_get_session():
     finally:
         db.close()
 
-app.dependency_overrides[get_session] = override_get_session
+@pytest.fixture(autouse=True)
+def apply_override():
+    app.dependency_overrides[get_session] = override_get_session
+    yield
+    del app.dependency_overrides[get_session]
 
 @pytest.fixture(autouse=True)
 def setup_db():
     Base.metadata.create_all(bind=engine)
     yield
     Base.metadata.drop_all(bind=engine)
+    try:
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            conn.execute(text("DROP TABLE IF EXISTS alembic_version"))
+            conn.commit()
+    except Exception:
+        pass
 
 def test_post_evento_idempotency():
     client = TestClient(app)

@@ -15,14 +15,18 @@ engine = create_engine(
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-def get_session_override():
-    db = TestingSessionLocal()
+def override_get_session():
     try:
+        db = TestingSessionLocal()
         yield db
     finally:
         db.close()
 
-app.dependency_overrides[get_session] = get_session_override
+@pytest.fixture(autouse=True)
+def apply_override():
+    app.dependency_overrides[get_session] = override_get_session
+    yield
+    del app.dependency_overrides[get_session]
 
 @pytest.fixture(name="client")
 def client_fixture():
@@ -31,6 +35,13 @@ def client_fixture():
     client = TestClient(app)
     yield client
     Base.metadata.drop_all(bind=engine)
+    try:
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            conn.execute(text("DROP TABLE IF EXISTS alembic_version"))
+            conn.commit()
+    except Exception:
+        pass
 
 def test_create_and_read_mapeo(client: TestClient):
     headers = {"Authorization": "Bearer test_token"}

@@ -10,4 +10,5 @@ EXTRACT_PRIVATE        = YES
 EXTRACT_STATIC         = YES
 SOURCE_BROWSER         = YES
 WARN_AS_ERROR          = YES
-EXCLUDE_PATTERNS = */venv/* */.venv/* */maubot/plugins/* */maubot/trash/*
+EXCLUDE = moodle-matrix-dev/README.md
+EXCLUDE_PATTERNS = */venv/* */.venv/* */maubot/plugins/* */maubot/trash/* */moodle-matrix-dev/README.md
