@@ -13,6 +13,8 @@ COMMIT_MSG_INGEST = "Ingesta automatica de conceptos"
 COMMIT_MSG_REVERT = "Reversion automatica de la ultima ingesta"
 COMMIT_MSG_SYNC = "Sincronización automática completa de material oficial"
 COMMIT_MSG_LOG = "Log interacción"
+COMMIT_MSG_CONCEPTOS = "[bot] okf: conceptos extraidos de interaccion"
 
 # Rutas estándar del formato OKF
 PATH_LOG_INTERACCIONES = "logs/interacciones"
+PATH_ENTITIES = "okf/entities"

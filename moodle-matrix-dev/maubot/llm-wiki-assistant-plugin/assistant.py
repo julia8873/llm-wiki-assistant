@@ -275,11 +275,41 @@ class LLMWikiAssistantPlugin(Plugin):
                 for i, chunk in enumerate(results):
                     system_prompt_with_context += f"--- Chunk {i+1} (Fichero: {chunk['file_path']}) ---\n{chunk['content']}\n\n"
             
+            system_prompt_with_context += """
+INSTRUCCIONES DE SALIDA:
+Debes responder obligatoriamente con un objeto JSON válido con la siguiente estructura estricta:
+{
+  "respuesta_al_alumno": "Tu respuesta en texto markdown...",
+  "conceptos_cubiertos": ["concepto1", "concepto2"]
+}
+El campo "conceptos_cubiertos" debe ser una lista de strings con los conceptos principales de la asignatura que se abordan en el intercambio. Si es un saludo o interacción trivial, devuelve una lista vacía [].
+"""
+            
             user_prompt = f"Pregunta: {query}"
             
-            response_text = await self.llm_client.get_response(system_prompt_with_context, user_prompt)
+            response_text = await self.llm_client.get_response(system_prompt_with_context, user_prompt, response_format="json")
             
-            await evt.respond(response_text)
+            import json
+            try:
+                # Remove markdown code blocks if present
+                if response_text.startswith("```json"):
+                    response_text = response_text.split("```json", 1)[1]
+                    if response_text.rfind("```") != -1:
+                        response_text = response_text[:response_text.rfind("```")]
+                elif response_text.startswith("```"):
+                    response_text = response_text.split("```", 1)[1]
+                    if response_text.rfind("```") != -1:
+                        response_text = response_text[:response_text.rfind("```")]
+                        
+                parsed_response = json.loads(response_text.strip())
+                respuesta = parsed_response.get("respuesta_al_alumno", "Hubo un error al generar la respuesta.")
+                conceptos = parsed_response.get("conceptos_cubiertos", [])
+            except json.JSONDecodeError as e:
+                self.log.error(f"Error parseando JSON del LLM: {response_text}")
+                respuesta = response_text
+                conceptos = []
+            
+            await evt.respond(respuesta)
             
             # 5. Encolar log de interacción (RAG) asíncronamente
             import datetime
@@ -290,7 +320,8 @@ class LLMWikiAssistantPlugin(Plugin):
                     "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
                     "matrix_room_id": room_id,
                     "mensaje_alumno": query,
-                    "respuesta_bot": response_text,
+                    "respuesta_bot": respuesta,
+                    "conceptos_cubiertos": conceptos,
                     "ficheros_consultados": ficheros_consultados,
                     "git_provider": "github"
                 }

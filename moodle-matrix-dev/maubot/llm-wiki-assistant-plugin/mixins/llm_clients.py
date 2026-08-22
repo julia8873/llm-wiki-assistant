@@ -9,7 +9,7 @@ class LLMClient:
     def __init__(self, config: Dict[str, Any]):
         self.config = config
 
-    async def get_response(self, system_prompt: str, user_prompt: str, max_tokens_override: int = None) -> str:
+    async def get_response(self, system_prompt: str, user_prompt: str, max_tokens_override: int = None, response_format: str = "text") -> str:
         """! 
         @brief Obtiene una respuesta de texto del LLM.
         @param system_prompt Instrucciones de sistema.
@@ -41,7 +41,7 @@ class OpenAICompatibleClient(LLMClient):
         if not self.api_base_url:
             raise LLMClientError(f"api_base_url no configurada para el cliente OpenAI compatible")
 
-    async def get_response(self, system_prompt: str, user_prompt: str, max_tokens_override: int = None) -> str:
+    async def get_response(self, system_prompt: str, user_prompt: str, max_tokens_override: int = None, response_format: str = "text") -> str:
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self.api_key}"
@@ -56,6 +56,9 @@ class OpenAICompatibleClient(LLMClient):
             "max_tokens": max_tokens_override if max_tokens_override else self.max_tokens,
             "top_p": self.top_p
         }
+        
+        if response_format == "json":
+            payload["response_format"] = {"type": "json_object"}
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             try:
@@ -115,7 +118,7 @@ class GeminiClient(LLMClient):
         if not self.api_key:
             raise LLMClientError(f"API key requerida en la variable {self.api_key_env_var}")
             
-    async def get_response(self, system_prompt: str, user_prompt: str, max_tokens_override: int = None) -> str:
+    async def get_response(self, system_prompt: str, user_prompt: str, max_tokens_override: int = None, response_format: str = "text") -> str:
         import logging
         logging.getLogger("llm_wiki.debug").error(f"SYSTEM PROMPT: {system_prompt}")
         url = f"{self.api_base_url}/models/{self.modelo}:generateContent?key={self.api_key}"
@@ -133,6 +136,9 @@ class GeminiClient(LLMClient):
                 "topP": self.top_p
             }
         }
+        
+        if response_format == "json":
+            payload["generationConfig"]["responseMimeType"] = "application/json"
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             max_retries = 3

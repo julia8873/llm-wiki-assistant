@@ -234,13 +234,39 @@ async def _async_log_interaction_task(matrix_room_id: str, repo_alumno_url: str,
             else:
                 logger.info(f"Entrada de log ya presente (idempotencia). Se omite escritura y commit local.")
 
-            # Hacer push independientemente de si se escribió ahora o ya estaba en el tree local
+            # Hacer push del log
             code, out, err = await run_git_command('push', 'origin', 'main', cwd=destino_local)
             if code != 0:
                 raise RuntimeError(f"Error en git push de logs: {err}")
                 
             code, out, err = await run_git_command('rev-parse', 'HEAD', cwd=destino_local)
             commit_sha = out.strip()
+            
+            # --- SEGUNDO COMMIT: CONCEPTOS EXTRAIDOS ---
+            conceptos = log_data.get("conceptos_cubiertos", [])
+            if conceptos:
+                logger.info(f"Registrando {len(conceptos)} conceptos en okf/entities/")
+                from shared_pkg.okf_contract import PATH_ENTITIES, COMMIT_MSG_CONCEPTOS
+                entities_dir = os.path.join(destino_local, PATH_ENTITIES)
+                os.makedirs(entities_dir, exist_ok=True)
+                
+                conceptos_path = os.path.join(entities_dir, f"{fecha}_conceptos.jsonl")
+                conceptos_data = {
+                    "timestamp": log_data["timestamp"],
+                    "matrix_room_id": matrix_room_id,
+                    "conceptos": conceptos,
+                    "interaction_hash": commit_sha  # Referencia al log
+                }
+                
+                with open(conceptos_path, "a", encoding="utf-8") as f:
+                    f.write(json.dumps(conceptos_data, ensure_ascii=False) + "\n")
+                    
+                await run_git_command('add', f'{PATH_ENTITIES}/{fecha}_conceptos.jsonl', cwd=destino_local)
+                code, out, err = await run_git_command('commit', '-m', COMMIT_MSG_CONCEPTOS, cwd=destino_local)
+                if code == 0:
+                    code, out, err = await run_git_command('push', 'origin', 'main', cwd=destino_local)
+                    if code != 0:
+                        logger.error(f"Error en git push de conceptos: {err}")
             
             # Escribir payload con commit_sha en un buffer local para backfill (fuera de git)
             backfill_payload = log_data.copy()
