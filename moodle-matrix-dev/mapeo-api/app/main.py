@@ -7,7 +7,7 @@ almacenando el estado en una base de datos local de SQLite/MariaDB.
 
 import os
 from typing import List, Optional
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, Response
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
@@ -21,7 +21,19 @@ from .models import MapeoCreate, MapeoRead, MapeoEstado, CursoCreate, EventoCrea
 from .db import create_db_and_tables, get_session, MapeoDB, EventosBotDB
 from .services.git import get_git_provider, GitProviderConfigError
 
-app = FastAPI(title="Mapeo API", description="API centralizada para la relación Alumno-Curso-Fork-Sala", docs_url=None if os.getenv("ENVIRONMENT") == "production" else "/docs", redoc_url=None if os.getenv("ENVIRONMENT") == "production" else "/redoc", openapi_url=None if os.getenv("ENVIRONMENT") == "production" else "/openapi.json")
+from starlette.middleware.base import BaseHTTPMiddleware
+from fastapi import Request
+
+class SunsetMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        route = request.scope.get("route")
+        if route and getattr(route, "deprecated", False):
+            response.headers["Sunset"] = "Wed, 01 Jan 2027 00:00:00 GMT"
+        return response
+
+app = FastAPI(title="Mapeo API", description="API centralizada para la relación Alumno-Curso-Fork-Sala", docs_url="/docs" if os.getenv("ENVIRONMENT") in ["dev", "local"] else None, redoc_url="/redoc" if os.getenv("ENVIRONMENT") in ["dev", "local"] else None, openapi_url="/openapi.json" if os.getenv("ENVIRONMENT") in ["dev", "local"] else None)
+app.add_middleware(SunsetMiddleware)
 
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError

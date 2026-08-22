@@ -23,7 +23,7 @@ class MapeoClient:
         
         async with httpx.AsyncClient(timeout=10.0) as client:
             try:
-                url = f"{self.api_url}/mapeos/by-room/{matrix_room_id}"
+                url = f"{self.api_url}/v1/mapeos/by-room/{matrix_room_id}"
                 response = await client.get(url, headers=headers)
                 
                 if response.status_code == 404:
@@ -67,7 +67,7 @@ class MapeoClient:
         
         async with httpx.AsyncClient(timeout=10.0) as client:
             try:
-                url = f"{self.api_url}/eventos"
+                url = f"{self.api_url}/v1/eventos"
                 response = await client.post(url, headers=headers, json=payload)
                 response.raise_for_status()
             except httpx.HTTPStatusError as e:

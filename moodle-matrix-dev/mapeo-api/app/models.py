@@ -7,7 +7,7 @@ tanto para la base de datos (SQLAlchemy) como para las peticiones/respuestas HTT
 
 from pydantic import BaseModel, ConfigDict
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
 from enum import Enum
 
@@ -31,6 +31,7 @@ class MapeoBase(BaseModel):
     estado: MapeoEstado = MapeoEstado.PENDIENTE_GITHUB
     is_teacher: bool = False
     moodle_username: Optional[str] = None
+    course_close_date: Optional[datetime] = None
 
 class MapeoCreate(MapeoBase):
     """!
@@ -59,6 +60,17 @@ class MapeoRead(MapeoBase):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+class PaginatedMapeos(BaseModel):
+    """!
+    @brief Respuesta paginada por cursor para listados de mapeos.
+    @details Sigue el patrón estándar de paginación (Fase 9).
+    """
+    data: List[MapeoRead]
+    next_cursor: Optional[int] = None
+    has_more: bool
+
+
 
 class CursoCreate(BaseModel):
     """!
