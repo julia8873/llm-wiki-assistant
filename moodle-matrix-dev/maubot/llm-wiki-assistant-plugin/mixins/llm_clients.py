@@ -9,7 +9,7 @@ class LLMClient:
     def __init__(self, config: Dict[str, Any]):
         self.config = config
 
-    async def get_response(self, system_prompt: str, user_prompt: str, max_tokens_override: int = None, response_format: str = "text") -> str:
+    async def get_response(self, system_prompt: str, user_prompt: str, max_tokens_override: int = None, response_format: str = "text", history: list = None) -> str:
         """! 
         @brief Obtiene una respuesta de texto del LLM.
         @param system_prompt Instrucciones de sistema.
@@ -41,23 +41,26 @@ class OpenAICompatibleClient(LLMClient):
         if not self.api_base_url:
             raise LLMClientError(f"api_base_url no configurada para el cliente OpenAI compatible")
 
-    async def get_response(self, system_prompt: str, user_prompt: str, max_tokens_override: int = None, response_format: str = "text") -> str:
+    async def get_response(self, system_prompt: str, user_prompt: str, max_tokens_override: int = None, response_format: str = "text", history: list = None) -> str:
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self.api_key}"
         }
+        
+        messages = [{"role": "system", "content": system_prompt}]
+        if history:
+            messages.extend(history)
+        messages.append({"role": "user", "content": user_prompt})
+        
         payload = {
             "model": self.modelo,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
+            "messages": messages,
             "temperature": self.temperatura,
             "max_tokens": max_tokens_override if max_tokens_override else self.max_tokens,
             "top_p": self.top_p
         }
         
-        if response_format == "json":
+        if response_format == "json" and "generativelanguage" not in self.api_base_url and "11434" not in self.api_base_url:
             payload["response_format"] = {"type": "json_object"}
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
@@ -65,6 +68,8 @@ class OpenAICompatibleClient(LLMClient):
                 response = await client.post(f"{self.api_base_url}/chat/completions", json=payload, headers=headers)
                 response.raise_for_status()
                 data = response.json()
+                import logging
+                logging.getLogger("llm_wiki.debug").error(f"RAW LLM RESPONSE: {data}")
                 return data["choices"][0]["message"]["content"]
             except httpx.HTTPStatusError as e:
                 raise LLMClientError(f"Error HTTP del LLM: {e.response.status_code} - {e.response.text}")
@@ -118,18 +123,24 @@ class GeminiClient(LLMClient):
         if not self.api_key:
             raise LLMClientError(f"API key requerida en la variable {self.api_key_env_var}")
             
-    async def get_response(self, system_prompt: str, user_prompt: str, max_tokens_override: int = None, response_format: str = "text") -> str:
+    async def get_response(self, system_prompt: str, user_prompt: str, max_tokens_override: int = None, response_format: str = "text", history: list = None) -> str:
         import logging
         logging.getLogger("llm_wiki.debug").error(f"SYSTEM PROMPT: {system_prompt}")
         url = f"{self.api_base_url}/models/{self.modelo}:generateContent?key={self.api_key}"
         headers = {"Content-Type": "application/json"}
+        
+        contents = []
+        if history:
+            for h in history:
+                role = "model" if h["role"] == "assistant" else "user"
+                contents.append({"role": role, "parts": [{"text": h["content"]}]})
+        contents.append({"role": "user", "parts": [{"text": user_prompt}]})
+        
         payload = {
             "systemInstruction": {
                 "parts": [{"text": system_prompt}]
             },
-            "contents": [{
-                "parts": [{"text": user_prompt}]
-            }],
+            "contents": contents,
             "generationConfig": {
                 "temperature": self.temperatura,
                 "maxOutputTokens": max_tokens_override if max_tokens_override else self.max_tokens,
@@ -272,8 +283,12 @@ def get_llm_client(config: Dict[str, Any]) -> LLMClient:
         
     provider_config = llm_config[provider_name]
     
-    if provider_name in ["openai", "ollama"]:
-        return OpenAICompatibleClient(provider_config)
+    if provider_name in ["openai", "ollama", "ugr"]:
+        client = OpenAICompatibleClient(provider_config)
+        if provider_name == "ugr" and "gemini" in llm_config:
+            gemini = GeminiClient(llm_config["gemini"])
+            client.get_embedding = gemini.get_embedding
+        return client
     elif provider_name == "gemini":
         return GeminiClient(provider_config)
     else:

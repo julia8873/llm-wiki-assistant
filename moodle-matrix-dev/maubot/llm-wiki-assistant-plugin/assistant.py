@@ -71,6 +71,7 @@ class LLMWikiAssistantPlugin(Plugin):
             self.log.error(f"Fallo al inicializar dependencias del bot: {e}")
         self.pending_files = {}  # {user_id: {"url": mxc_url, "filename": name}}
         self.teacher_mode = {}   # {room_id: "oficial" | "carpeta"}
+        self.chat_memory = {}    # {room_id: [{"role": "user", "content": "..."}, ...]}
 
     async def stop(self) -> None:
         if hasattr(self, 'vector_store'):
@@ -275,41 +276,75 @@ class LLMWikiAssistantPlugin(Plugin):
                 for i, chunk in enumerate(results):
                     system_prompt_with_context += f"--- Chunk {i+1} (Fichero: {chunk['file_path']}) ---\n{chunk['content']}\n\n"
             
-            system_prompt_with_context += """
+            base_url_for_links = repo_url[:-4] if repo_url and repo_url.endswith(".git") else repo_url
+            system_prompt_with_context += f"""
 INSTRUCCIONES DE SALIDA:
 Debes responder obligatoriamente con un objeto JSON válido con la siguiente estructura estricta:
-{
+{{
   "respuesta_al_alumno": "Tu respuesta en texto markdown...",
-  "conceptos_cubiertos": ["concepto1", "concepto2"]
-}
+  "conceptos_cubiertos": ["concepto1", "concepto2"],
+  "mantener_contexto": true
+}}
 El campo "conceptos_cubiertos" debe ser una lista de strings con los conceptos principales de la asignatura que se abordan en el intercambio. Si es un saludo o interacción trivial, devuelve una lista vacía [].
+El campo "mantener_contexto" debe ser un booleano (true/false) que indica si este mensaje mantiene el contexto o tema de la conversación anterior. Si el usuario cambia drásticamente de tema, o la conversación anterior ya no es relevante, debes devolver false para reiniciar la memoria del chat.
+IMPORTANTE SOBRE LA ESTRUCTURA Y CITAS:
+1. NUNCA agrupes toda tu explicación en un solo párrafo. Desarrolla siempre tus explicaciones de forma extensa y detallada separándolas en MÚLTIPLES PÁRRAFOS para facilitar la lectura.
+2. Al final de CADA párrafo individual, DEBES incluir EXCLUSIVAMENTE los enlaces a los ficheros de los que has extraído la información de ese párrafo.
+3. Formatea las citas siempre como una lista Markdown con un guion (cada enlace en una nueva línea).
+Ejemplo:
+Este es el primer párrafo de tu explicación, muy extenso y detallado sobre la teoría.
+- [ruta/al/fichero1.md]({base_url_for_links}/blob/main/ruta/al/fichero1.md)
+
+Este es el segundo párrafo de tu explicación abordando otro aspecto con más profundidad.
+- [ruta/al/fichero2.md]({base_url_for_links}/blob/main/ruta/al/fichero2.md)
 """
             
             user_prompt = f"Pregunta: {query}"
             
-            response_text = await self.llm_client.get_response(system_prompt_with_context, user_prompt, response_format="json")
+            history = self.chat_memory.get(evt.room_id, [])
+            
+            response_text = await self.llm_client.get_response(system_prompt_with_context, user_prompt, response_format="json", history=history)
             
             import json
             try:
                 # Remove markdown code blocks if present
-                if response_text.startswith("```json"):
-                    response_text = response_text.split("```json", 1)[1]
-                    if response_text.rfind("```") != -1:
-                        response_text = response_text[:response_text.rfind("```")]
-                elif response_text.startswith("```"):
-                    response_text = response_text.split("```", 1)[1]
-                    if response_text.rfind("```") != -1:
-                        response_text = response_text[:response_text.rfind("```")]
+                import re
+                json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', response_text, re.DOTALL)
+                if json_match:
+                    clean_json = json_match.group(1)
+                else:
+                    start_idx = response_text.find('{')
+                    end_idx = response_text.rfind('}')
+                    if start_idx != -1 and end_idx != -1:
+                        clean_json = response_text[start_idx:end_idx+1]
+                    else:
+                        clean_json = response_text
                         
-                parsed_response = json.loads(response_text.strip())
+                parsed_response = json.loads(clean_json)
                 respuesta = parsed_response.get("respuesta_al_alumno", "Hubo un error al generar la respuesta.")
                 conceptos = parsed_response.get("conceptos_cubiertos", [])
+                mantener_contexto = parsed_response.get("mantener_contexto", True)
             except json.JSONDecodeError as e:
                 self.log.error(f"Error parseando JSON del LLM: {response_text}")
                 respuesta = response_text
                 conceptos = []
+                mantener_contexto = False
             
             await evt.respond(respuesta)
+            
+            # Actualizar memoria
+            if evt.room_id not in self.chat_memory:
+                self.chat_memory[evt.room_id] = []
+                
+            if not mantener_contexto:
+                self.chat_memory[evt.room_id] = []
+                
+            self.chat_memory[evt.room_id].append({"role": "user", "content": query})
+            self.chat_memory[evt.room_id].append({"role": "assistant", "content": respuesta})
+            
+            # Limitar a los últimos 6 mensajes (3 turnos)
+            if len(self.chat_memory[evt.room_id]) > 6:
+                self.chat_memory[evt.room_id] = self.chat_memory[evt.room_id][-6:]
             
             # 5. Encolar log de interacción (RAG) asíncronamente
             import datetime
