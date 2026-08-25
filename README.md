@@ -1,6 +1,6 @@
 # LLM Wiki Assistant
 
-[![Fase Actual](https://img.shields.io/badge/Estado-Fase_7_Completada-success.svg)](docs/index.md)
+![Fase Actual](https://img.shields.io/badge/Estado-Fase_7_Completada-success.svg)
 [![Doxygen](https://img.shields.io/badge/Docs-Doxygen-blue.svg)](Doxyfile)
 [![LLM Multi-Provider](https://img.shields.io/badge/LLM-OpenAI_|_Gemini_|_Ollama-blue.svg)](config/config.yaml)
 [![Entrypoint](https://img.shields.io/badge/Entrypoint-instalar.sh-orange.svg)](instalar.sh)
@@ -15,7 +15,7 @@ Sistema integrado de docencia Moodle-Matrix-Git. Proporciona a cada estudiante u
 - [Funcionalidades del Bot en Matrix (OKF v0.1)](#funcionalidades_bot)
 - [Credenciales de Prueba](#credenciales_prueba)
 - [Inventario de Componentes y Carpetas Clave](#inventario_componentes)
-- [Fases de Implementación y Estado](docs/resumen-fases.md)
+- Fases de Implementación y Estado
 
 ## Guía de Instalación y Puesta en Marcha {#paso_a_paso}
 

@@ -102,9 +102,7 @@ Esta fase conectó el frontend del LMS (Moodle) con el backend de orquestación,
 - **Integración Transaccional e Idempotencia**:
   - Para evitar la creación de salas duplicadas en Matrix si un usuario hace "doble clic" o lanza múltiples peticiones asíncronas, se utilizó la **Locking API** nativa de Moodle.
   - **Fallback de Idempotencia**: Si, por alguna condición de carrera remota o fallo de red local, Moodle lanza la orden de creación pero el microservicio de mapeo devuelve un HTTP 409 Conflict (porque la sala ya se registró milisegundos antes), el bloque captura la excepción silenciosamente y vuelve a lanzar un get_mapeo para recuperar la sala recién inyectada, asegurando la redirección correcta.
-- **Evitación de Conflictos (Doxygen vs Moodle Autoloader)**:
-  - **El Problema**: Doxygen fallaba (modo estricto) al encontrar nombres de clases con guión bajo precedidos por namespaces PHP (`\block_bdc\mapeo_client`). Si se retiraban los namespaces pero los ficheros se dejaban en la carpeta `classes/`, el autoloader estricto de Moodle 4+ provocaba un error fatal (`exit 1`) durante el proceso de actualización de la base de datos de Docker.
-  - **La Solución**: Los clientes API de mapeo y Synapse fueron movidos estratégicamente a la carpeta `lib/` (usando nombres de clase legacy como `block_bdc_mapeo_client`), puenteando por completo el autoloader automático de Moodle y cargándolos de forma manual vía `require_once`. Esto resolvió limpiamente los conflictos de Doxygen y Moodle de un plumazo.
+
 - **Despliegue Continuo (Docker)**:
   - Se configuró el mapeo de volumen del bloque en el `docker-compose.yml` conectando el código local con `/bitnami/moodle/blocks/bdc`, permitiendo a Moodle detectar y actualizar el código en tiempo real.
 

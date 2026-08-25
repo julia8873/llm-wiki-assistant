@@ -1,6 +1,6 @@
 PROJECT_NAME           = "LLM Wiki Assistant"
 OUTPUT_DIRECTORY       = doxygen_docs
-INPUT                  = docs README.md moodle-matrix-dev
+INPUT                  = README.md moodle-matrix-dev
 USE_MDFILE_AS_MAINPAGE = README.md
 RECURSIVE              = YES
 GENERATE_HTML          = YES
@@ -11,4 +11,4 @@ EXTRACT_STATIC         = YES
 SOURCE_BROWSER         = YES
 WARN_AS_ERROR          = YES
 EXCLUDE = moodle-matrix-dev/README.md
-EXCLUDE_PATTERNS = */venv/* */.venv/* */maubot/plugins/* */maubot/trash/* */moodle-matrix-dev/README.md
+EXCLUDE_PATTERNS = */venv/* */.venv/* */maubot/plugins/* */maubot/trash/* */moodle-matrix-dev/README.md */docs/*
