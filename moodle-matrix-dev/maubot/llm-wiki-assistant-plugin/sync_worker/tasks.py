@@ -326,7 +326,7 @@ async def _async_log_interaccion_extraccion_task(matrix_room_id: str, repo_alumn
                 with open("/config/config.yaml", "r") as config_file:
                     config = yaml.safe_load(config_file)
                     batching_sec = int(config.get("timings", {}).get("batching_interacciones_sec", 300))
-                    logger.info(f"Timings cargados desde /config/config.yaml: batching_interacciones_sec={batching_sec}s")
+                    print(f"Timings cargados desde /config/config.yaml: batching_interacciones_sec={batching_sec}s")
             except Exception as e:
                 logger.warning(f"No se pudo leer batching_interacciones_sec desde /config/config.yaml: {e}")
                 
