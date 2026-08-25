@@ -320,7 +320,15 @@ async def _async_log_interaccion_extraccion_task(matrix_room_id: str, repo_alumn
                     f.write(line_str + "\n")
             
             # --- Lógica de Batching ---
-            batching_sec = int(os.environ.get("BATCHING_INTERACCIONES_SEC", 300))
+            batching_sec = 300
+            try:
+                import yaml
+                with open("/config/config.yaml", "r") as config_file:
+                    config = yaml.safe_load(config_file)
+                    batching_sec = int(config.get("timings", {}).get("batching_interacciones_sec", 300))
+            except Exception as e:
+                logger.warning(f"No se pudo leer batching_interacciones_sec desde /config/config.yaml: {e}")
+                
             flag_path = os.path.join(destino_local, ".batch_timestamp")
             
             current_time = time.time()
