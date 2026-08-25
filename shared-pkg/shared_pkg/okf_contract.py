@@ -16,3 +16,7 @@ COMMIT_MSG_LOG = "Log interacción"
 
 # Rutas estándar del formato OKF
 PATH_LOG_INTERACCIONES = "logs/interacciones"
+PATH_INTERACCIONES = "okf/interacciones"
+
+# Mensaje para la extracción de metadatos de interacciones
+COMMIT_MSG_INTERACCION = "Extracción automática de interacciones"
