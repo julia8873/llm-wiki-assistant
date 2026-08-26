@@ -319,60 +319,30 @@ async def _async_log_interaccion_extraccion_task(matrix_room_id: str, repo_alumn
                 with open(log_path, "a", encoding="utf-8") as f:
                     f.write(line_str + "\n")
             
-            # --- Lógica de Batching ---
-            batching_sec = 300
-            try:
-                import yaml
-                with open("/config/config.yaml", "r") as config_file:
-                    config = yaml.safe_load(config_file)
-                    batching_sec = int(config.get("timings", {}).get("batching_interacciones_sec", 300))
-                    print(f"Timings cargados desde /config/config.yaml: batching_interacciones_sec={batching_sec}s")
-            except Exception as e:
-                logger.warning(f"No se pudo leer batching_interacciones_sec desde /config/config.yaml: {e}")
-                
-            flag_path = os.path.join(destino_local, ".batch_timestamp")
+            # --- Actualización en tiempo real (Batching removido temporalmente) ---
+            await run_git_command('add', f'{PATH_INTERACCIONES}/*.jsonl', cwd=destino_local)
             
-            current_time = time.time()
-            last_commit_time = 0
-            if os.path.exists(flag_path):
+            code, out, err = await run_git_command('commit', '-m', COMMIT_MSG_INTERACCION, cwd=destino_local)
+            if code == 0 or "nothing to commit" in out:
+                code_push, out_push, err_push = await run_git_command('push', 'origin', 'main', cwd=destino_local)
+                if code_push != 0:
+                    raise RuntimeError(f"Error en git push de extracciones: {err_push}")
+                
+                # Notificar a la Capa 2
+                code_rev, out_rev, err_rev = await run_git_command('rev-parse', 'HEAD', cwd=destino_local)
+                commit_sha = out_rev.strip()
                 try:
-                    with open(flag_path, "r") as f:
-                        last_commit_time = float(f.read().strip())
-                except ValueError:
-                    pass
-            
-            if (current_time - last_commit_time) >= batching_sec:
-                # Hora de comitear
-                await run_git_command('add', f'{PATH_INTERACCIONES}/*.jsonl', cwd=destino_local)
-                
-                # Update timestamp file
-                with open(flag_path, "w") as f:
-                    f.write(str(current_time))
-                await run_git_command('add', '.batch_timestamp', cwd=destino_local)
-                
-                code, out, err = await run_git_command('commit', '-m', COMMIT_MSG_INTERACCION, cwd=destino_local)
-                if code == 0:
-                    code_push, out_push, err_push = await run_git_command('push', 'origin', 'main', cwd=destino_local)
-                    if code_push != 0:
-                        raise RuntimeError(f"Error en git push de extracciones: {err_push}")
-                    
-                    # Notificar a la Capa 2
-                    code_rev, out_rev, err_rev = await run_git_command('rev-parse', 'HEAD', cwd=destino_local)
-                    commit_sha = out_rev.strip()
-                    try:
-                        client = get_mapeo_client()
-                        await client.post_evento(
-                            matrix_room_id=matrix_room_id,
-                            commit_sha=commit_sha,
-                            tipo_evento="EXTRACTION",
-                            timestamp_str=datetime.datetime.utcnow().isoformat() + "Z"
-                        )
-                    except Exception as e:
-                        logger.error(f"Error posteando evento EXTRACTION a mapeo-api: {e}")
-                else:
-                    logger.warning(f"Git commit extracciones omitido (sin cambios): {err}")
+                    client = get_mapeo_client()
+                    await client.post_evento(
+                        matrix_room_id=matrix_room_id,
+                        commit_sha=commit_sha,
+                        tipo_evento="EXTRACTION",
+                        timestamp_str=datetime.datetime.utcnow().isoformat() + "Z"
+                    )
+                except Exception as e:
+                    logger.error(f"Error posteando evento EXTRACTION a mapeo-api: {e}")
             else:
-                logger.info(f"Batching: aún no toca commit (faltan {batching_sec - (current_time - last_commit_time):.1f}s)")
+                logger.info(f"Nada que comitear para extracciones.")
                 
     except Exception as e:
         logger.error(f"Fallo en log_interaccion_extraccion_task: {e}")
