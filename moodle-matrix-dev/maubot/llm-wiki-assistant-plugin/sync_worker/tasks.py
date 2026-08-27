@@ -180,13 +180,13 @@ async def _async_init_teacher_repo_task(matrix_room_id: str, official_repo_url: 
         logger.error(f"Fallo en init_teacher_repo_task: {e}")
         raise e
 
-def log_interaction_task(matrix_room_id: str, repo_alumno_url: str, official_repo_url: str, log_data: dict):
+def log_interaccion_unificada_task(matrix_room_id: str, repo_alumno_url: str, official_repo_url: str, log_data: dict):
     """!
-    @brief Tarea síncrona que envuelve el loop asíncrono para registrar una interacción RAG.
+    @brief Tarea síncrona que envuelve el loop asíncrono para registrar una interacción unificada (Fase 11.1).
     """
-    asyncio.run(_async_log_interaction_task(matrix_room_id, repo_alumno_url, official_repo_url, log_data))
+    asyncio.run(_async_log_interaccion_unificada_task(matrix_room_id, repo_alumno_url, official_repo_url, log_data))
 
-async def _async_log_interaction_task(matrix_room_id: str, repo_alumno_url: str, official_repo_url: str, log_data: dict):
+async def _async_log_interaccion_unificada_task(matrix_room_id: str, repo_alumno_url: str, official_repo_url: str, log_data: dict):
     import urllib.parse
     import json
     import datetime
@@ -195,7 +195,7 @@ async def _async_log_interaction_task(matrix_room_id: str, repo_alumno_url: str,
     safe_name = urllib.parse.quote_plus(repo_alumno_url)
     destino_local = f"/tmp/llm_wiki_repos/{safe_name}"
     
-    logger.info(f"Iniciando log_interaction_task para la sala {matrix_room_id}")
+    logger.info(f"Iniciando log_interaccion_unificada_task para la sala {matrix_room_id}")
 
     try:
         async with distributed_repo_lock(destino_local):
@@ -205,7 +205,14 @@ async def _async_log_interaction_task(matrix_room_id: str, repo_alumno_url: str,
             os.makedirs(interacciones_dir, exist_ok=True)
             
             # Formato de archivo: logs/interacciones/YYYY-MM-DD.jsonl
-            fecha = datetime.datetime.now().strftime("%Y-%m-%d")
+            # Extract timestamp directly from log_data or use current
+            iso_timestamp = log_data.get("timestamp", datetime.datetime.utcnow().isoformat() + "Z")
+            try:
+                dt = datetime.datetime.fromisoformat(iso_timestamp.replace("Z", "+00:00"))
+                fecha = dt.strftime("%Y-%m-%d")
+            except Exception:
+                fecha = datetime.datetime.utcnow().strftime("%Y-%m-%d")
+
             log_path = os.path.join(destino_local, PATH_LOG_INTERACCIONES, f"{fecha}.jsonl")
             
             # Serializar la entrada para hacer el append
@@ -228,7 +235,7 @@ async def _async_log_interaction_task(matrix_room_id: str, repo_alumno_url: str,
                     f.write(line_str + "\n")
                 
                 await run_git_command('add', f'{PATH_LOG_INTERACCIONES}/{fecha}.jsonl', cwd=destino_local)
-                code, out, err = await run_git_command('commit', '-m', f'{COMMIT_MSG_LOG} {log_data.get("timestamp", "")}', cwd=destino_local)
+                code, out, err = await run_git_command('commit', '-m', f'{COMMIT_MSG_LOG} {iso_timestamp}', cwd=destino_local)
                 if code != 0:
                     logger.warning(f"Git commit omitido (sin cambios): {err}")
             else:
@@ -265,85 +272,5 @@ async def _async_log_interaction_task(matrix_room_id: str, repo_alumno_url: str,
             logger.info("Log de interacciones completado exitosamente.")
             
     except Exception as e:
-        logger.error(f"Fallo en log_interaction_task: {e}")
-        raise e
-def log_interaccion_extraccion_task(matrix_room_id: str, repo_alumno_url: str, official_repo_url: str, meta_data: dict):
-    """!
-    @brief Tarea síncrona que envuelve el loop asíncrono para registrar extracción de interacciones (Fase 11).
-    """
-    asyncio.run(_async_log_interaccion_extraccion_task(matrix_room_id, repo_alumno_url, official_repo_url, meta_data))
-
-async def _async_log_interaccion_extraccion_task(matrix_room_id: str, repo_alumno_url: str, official_repo_url: str, meta_data: dict):
-    import urllib.parse
-    import json
-    import datetime
-    import hashlib
-    import time
-    from shared_pkg.okf_contract import COMMIT_MSG_INTERACCION, PATH_INTERACCIONES
-    
-    safe_name = urllib.parse.quote_plus(repo_alumno_url)
-    destino_local = f"/tmp/llm_wiki_repos/{safe_name}"
-    
-    logger.info(f"Iniciando log_interaccion_extraccion_task para la sala {matrix_room_id}")
-
-    try:
-        async with distributed_repo_lock(destino_local):
-            await asegurar_repo_local(repo_alumno_url, official_repo_url, destino_local)
-            
-            interacciones_dir = os.path.join(destino_local, PATH_INTERACCIONES)
-            os.makedirs(interacciones_dir, exist_ok=True)
-            
-            # Extract timestamp directly from meta_data or use current
-            iso_timestamp = meta_data.get("timestamp", datetime.datetime.utcnow().isoformat() + "Z")
-            # The date prefix for the file (YYYY-MM-DD)
-            try:
-                dt = datetime.datetime.fromisoformat(iso_timestamp.replace("Z", "+00:00"))
-                fecha = dt.strftime("%Y-%m-%d")
-            except Exception:
-                fecha = datetime.datetime.utcnow().strftime("%Y-%m-%d")
-
-            log_path = os.path.join(destino_local, PATH_INTERACCIONES, f"{fecha}.jsonl")
-            
-            line_str = json.dumps(meta_data, ensure_ascii=False)
-            line_hash = hashlib.sha256(line_str.encode('utf-8')).hexdigest()
-            already_logged = False
-            
-            if os.path.exists(log_path):
-                with open(log_path, "r", encoding="utf-8") as f:
-                    for line in f:
-                        if hashlib.sha256(line.strip().encode('utf-8')).hexdigest() == line_hash:
-                            already_logged = True
-                            break
-            
-            if not already_logged:
-                with open(log_path, "a", encoding="utf-8") as f:
-                    f.write(line_str + "\n")
-            
-            # --- Actualización en tiempo real (Batching removido temporalmente) ---
-            await run_git_command('add', f'{PATH_INTERACCIONES}/*.jsonl', cwd=destino_local)
-            
-            code, out, err = await run_git_command('commit', '-m', COMMIT_MSG_INTERACCION, cwd=destino_local)
-            if code == 0 or "nothing to commit" in out:
-                code_push, out_push, err_push = await run_git_command('push', 'origin', 'main', cwd=destino_local)
-                if code_push != 0:
-                    raise RuntimeError(f"Error en git push de extracciones: {err_push}")
-                
-                # Notificar a la Capa 2
-                code_rev, out_rev, err_rev = await run_git_command('rev-parse', 'HEAD', cwd=destino_local)
-                commit_sha = out_rev.strip()
-                try:
-                    client = get_mapeo_client()
-                    await client.post_evento(
-                        matrix_room_id=matrix_room_id,
-                        commit_sha=commit_sha,
-                        tipo_evento="EXTRACTION",
-                        timestamp_str=datetime.datetime.utcnow().isoformat() + "Z"
-                    )
-                except Exception as e:
-                    logger.error(f"Error posteando evento EXTRACTION a mapeo-api: {e}")
-            else:
-                logger.info(f"Nada que comitear para extracciones.")
-                
-    except Exception as e:
-        logger.error(f"Fallo en log_interaccion_extraccion_task: {e}")
+        logger.error(f"Fallo en log_interaccion_unificada_task: {e}")
         raise e

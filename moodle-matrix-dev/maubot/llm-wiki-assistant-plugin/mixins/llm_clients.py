@@ -266,7 +266,7 @@ def get_llm_client(config: Dict[str, Any]) -> LLMClient:
         
     provider_config = llm_config[provider_name]
     
-    if provider_name in ["openai", "ollama"]:
+    if provider_name in ["openai", "ollama", "ugr"]:
         return OpenAICompatibleClient(provider_config)
     elif provider_name == "gemini":
         return GeminiClient(provider_config)

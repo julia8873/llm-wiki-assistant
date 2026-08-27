@@ -126,11 +126,11 @@ async def asegurar_repo_local(repo_alumno_url: str, official_repo_url: Optional[
         logger.info(f"Repositorio ya existe en {destino_local}, haciendo fetch/pull")
         code, out, err = await run_git_command('fetch', 'origin', cwd=destino_local)
         if code != 0:
-            logger.warning(f"Error en fetch origin: {err}")
+            raise RuntimeError(f"Error en fetch origin: {err}")
             
         code, out, err = await run_git_command('reset', '--hard', 'origin/HEAD', cwd=destino_local)
         if code != 0:
-            logger.warning(f"Error en reset origin/HEAD: {err}")
+            raise RuntimeError(f"Error en reset origin/HEAD: {err}")
 
     # Set author for bot commits (alway ensure it's set)
     await run_git_command('config', 'user.name', 'LLM Wiki Assistant', cwd=destino_local)

@@ -15,7 +15,7 @@ from mixins.mapeo_client import MapeoClient, MapeoClientError
 from mixins.repo_reader import RepoReader, RepoReaderError
 from mixins.vector_store import VectorStore
 from mixins.llm_clients import get_llm_client, LLMClientError
-from sync_worker.tasks import _async_sync_repo_task, log_interaction_task
+from sync_worker.tasks import _async_sync_repo_task, log_interaccion_unificada_task
 import redis
 from rq import Queue, Retry
 
@@ -358,46 +358,29 @@ class LLMWikiAssistantPlugin(Plugin):
             import datetime
             try:
                 ficheros_consultados = [chunk['file_path'] for chunk in results] if results else []
-                log_data = {
+                log_data_unificado = {
                     "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
                     "matrix_room_id": room_id,
                     "mensaje_alumno": query,
                     "respuesta_bot": respuesta_bot,
+                    "tipo_interaccion": tipo_interaccion,
+                    "concepto": concepto,
                     "ficheros_consultados": ficheros_consultados,
                     "git_provider": "github"
                 }
                 
                 log_queue.enqueue(
-                    log_interaction_task,
+                    log_interaccion_unificada_task,
                     kwargs={
                         "matrix_room_id": room_id,
                         "repo_alumno_url": repo_url,
                         "official_repo_url": official_repo_url,
-                        "log_data": log_data
+                        "log_data": log_data_unificado
                     },
                     job_timeout="5m",
                     retry=Retry(max=3, interval=[10, 30, 60])
                 )
                 
-                # --- NUEVO ENCOLE FASE 11 (Solo metadatos) ---
-                from sync_worker.tasks import log_interaccion_extraccion_task
-                meta_data = {
-                    "timestamp": log_data["timestamp"],
-                    "matrix_room_id": room_id,
-                    "tipo_interaccion": tipo_interaccion,
-                    "concepto": concepto
-                }
-                log_queue.enqueue(
-                    log_interaccion_extraccion_task,
-                    kwargs={
-                        "matrix_room_id": room_id,
-                        "repo_alumno_url": repo_url,
-                        "official_repo_url": official_repo_url,
-                        "meta_data": meta_data
-                    },
-                    job_timeout="5m",
-                    retry=Retry(max=3, interval=[10, 30, 60])
-                )
                 self.log.info(f"Log de interacción encolado exitosamente para la sala {room_id}")
             except Exception as log_error:
                 # Log de advertencia silencioso para no descartar la respuesta ya dada
