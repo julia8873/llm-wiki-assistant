@@ -89,3 +89,15 @@ class EventoRead(EventoCreate):
     created_at: datetime
     
     model_config = ConfigDict(from_attributes=True)
+
+class DiscrepanciaAuditPayload(BaseModel):
+    moodle_user_id: Optional[int] = None
+    moodle_course_id: Optional[int] = None
+    commit_sha: str
+    tipo_discrepancia: str
+    detalles: Optional[dict] = None
+    resuelta_por: Optional[int] = None
+    resuelta_at: str
+
+class DiscrepanciaAuditResponse(BaseModel):
+    commit_log_ref: str

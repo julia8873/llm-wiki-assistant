@@ -20,3 +20,6 @@ class SelfHostedProvider(GitProviderClient):
 
     async def existe_repo(self, repo_url: str) -> bool:
         raise NotImplementedError("SelfHostedProvider pendiente de definición tecnológica (OSL).")
+        
+    async def crear_commit_archivo(self, repo_url: str, path: str, content: str, message: str) -> str:
+        raise NotImplementedError("SelfHostedProvider pendiente de definición tecnológica (OSL).")

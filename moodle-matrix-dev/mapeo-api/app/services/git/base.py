@@ -43,3 +43,15 @@ class GitProviderClient(ABC):
         @return True si existe, False en caso contrario.
         """
         pass
+        
+    @abstractmethod
+    async def crear_commit_archivo(self, repo_url: str, path: str, content: str, message: str) -> str:
+        """!
+        @brief Crea o actualiza un archivo en el repositorio mediante un commit directo.
+        @param repo_url URL del repositorio.
+        @param path Ruta del archivo dentro del repo (ej. logs/audit.jsonl).
+        @param content Contenido completo del archivo.
+        @param message Mensaje de commit.
+        @return SHA del commit creado.
+        """
+        pass

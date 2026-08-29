@@ -141,3 +141,40 @@ class GitHubProvider(GitProviderClient):
                 return gen_res.json().get("clone_url", f"https://github.com/{self.org}/{nombre_repo}.git")
             else:
                 raise GitHubProvisionError(f"Error al aprovisionar {self.org}/{nombre_repo}: HTTP {gen_res.status_code} {gen_res.text}")
+
+    async def crear_commit_archivo(self, repo_url: str, path: str, content: str, message: str) -> str:
+        repo_name = repo_url.split('/')[-1].replace('.git', '')
+        
+        import base64
+        
+        async with await self._get_client() as client:
+            # Check if file exists to get its SHA and current content
+            file_res = await client.get(f"/repos/{self.org}/{repo_name}/contents/{path}")
+            
+            final_content = content
+            sha = None
+            if file_res.status_code == 200:
+                file_data = file_res.json()
+                sha = file_data["sha"]
+                # Decode existing content and append new content
+                existing_content = base64.b64decode(file_data["content"]).decode('utf-8')
+                final_content = existing_content + content
+                
+            encoded_content = base64.b64encode(final_content.encode('utf-8')).decode('utf-8')
+            
+            data = {
+                "message": message,
+                "content": encoded_content
+            }
+            if sha:
+                data["sha"] = sha
+                
+            put_res = await client.put(
+                f"/repos/{self.org}/{repo_name}/contents/{path}",
+                json=data
+            )
+            
+            if put_res.status_code in (200, 201):
+                return put_res.json()["commit"]["sha"]
+            else:
+                raise GitHubProvisionError(f"Failed to create/update file {path} in {repo_name}: HTTP {put_res.status_code} {put_res.text}")

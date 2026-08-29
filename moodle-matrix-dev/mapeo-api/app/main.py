@@ -407,3 +407,47 @@ def read_eventos_recientes(response: Response, request: Request,
     """Devuelve los eventos más recientes."""
     results = session.query(EventosBotDB).order_by(EventosBotDB.created_at.desc()).limit(limit).all()
     return results
+
+from .models import DiscrepanciaAuditPayload, DiscrepanciaAuditResponse
+import json
+from datetime import datetime
+
+@app.post("/v1/audit/discrepancias", response_model=DiscrepanciaAuditResponse, status_code=status.HTTP_201_CREATED)
+async def audit_discrepancia(response: Response, request: Request, payload: DiscrepanciaAuditPayload, session: Session = Depends(get_session), token: str = Depends(verify_token)):
+    """!
+    @brief Registra la resolución de una discrepancia en el repositorio del alumno.
+    """
+    if not payload.moodle_user_id or not payload.moodle_course_id:
+        raise HTTPException(status_code=400, detail="moodle_user_id and moodle_course_id are required")
+        
+    mapeo = session.query(MapeoDB).filter(
+        MapeoDB.moodle_user_id == payload.moodle_user_id,
+        MapeoDB.moodle_course_id == payload.moodle_course_id
+    ).first()
+    
+    if not mapeo or not mapeo.repo_url:
+        raise HTTPException(status_code=404, detail="Mapeo o repositorio no encontrado")
+
+    try:
+        provider = get_git_provider()
+        
+        # Format payload as JSONL
+        jsonl_line = json.dumps(payload.model_dump()) + "\n"
+        
+        # Calculate file path based on current date
+        current_date = datetime.utcnow().strftime("%Y-%m-%d")
+        file_path = f"logs/discrepancias/{current_date}.jsonl"
+        
+        # Commit directly to the repository using the provider (which must implement crear_commit_archivo)
+        commit_sha = await provider.crear_commit_archivo(
+            repo_url=mapeo.repo_url,
+            path=file_path,
+            content=jsonl_line,
+            message=f"Audit: Resolución de discrepancia {payload.tipo_discrepancia}"
+        )
+        
+        return DiscrepanciaAuditResponse(commit_log_ref=commit_sha)
+    except Exception as e:
+        import logging
+        logging.error(f"Failed to audit discrepancia: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Fallo al registrar auditoría en Git: {str(e)}")

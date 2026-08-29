@@ -116,3 +116,6 @@ class GitLabProvider(GitProviderClient):
                 return repo_data.get("http_url_to_repo")
             else:
                 raise GitLabProvisionError(f"Error al aprovisionar {self.org}/{nombre_repo}: HTTP {res.status_code} {res.text}")
+
+    async def crear_commit_archivo(self, repo_url: str, path: str, content: str, message: str) -> str:
+        raise NotImplementedError("crear_commit_archivo not implemented for GitLab yet")
