@@ -48,4 +48,16 @@ password_providers:
     config:
       endpoint: "http://moodle:8080/blocks/bdc/api/auth.php"
 
+# Aumentar límites para evitar M_LIMIT_EXCEEDED en logins locales
+rc_login:
+  address:
+    per_second: 100
+    burst_count: 500
+  account:
+    per_second: 100
+    burst_count: 500
+  failed_attempts:
+    per_second: 100
+    burst_count: 500
+
 # vim:ft=yaml

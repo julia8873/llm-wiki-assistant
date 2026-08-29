@@ -49,6 +49,9 @@ services:
       timeout: 5s
       retries: 5
       start_period: 180s
+    networks:
+      - default
+      - bdc-net
 
   synapse:
     image: matrixdotorg/synapse:latest
