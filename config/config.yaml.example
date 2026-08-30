@@ -85,9 +85,9 @@ git:
     token_env_var: "GIT_SELF_HOSTED_TOKEN"
 
 llm:
-  # Proveedor activo: "openai", "gemini" u "ollama"
-  # La API Key correspondiente debe estar en .env (OPENAI_API_KEY o GEMINI_API_KEY)
-  proveedor_activo: "CHANGE_ME"
+  # Proveedor activo: "openai", "gemini", "ollama" o "ugr"
+  # Para UGR: requiere tunel SSH activo: ssh -L 0.0.0.0:11434:iaceprud.ugr.es:11434 julia@devceprud.ugr.es -p 24134
+  proveedor_activo: "ollama"
 
   openai:
     modelo_defecto: "gpt-4o-mini"
@@ -110,11 +110,12 @@ llm:
     timeout_segundos: 60
 
   ollama:
-    modelo_defecto: "llama3"
-    api_base_url: "http://localhost:11434/v1"
+    modelo_defecto: "qwen3.6:35b-a3b"
+    api_base_url: "http://host.docker.internal:11434/v1"
     api_key_env_var: "OLLAMA_API_KEY_DUMMY"
+    api_key: "ollama"
     temperatura: 0.2
-    max_tokens: 1024
+    max_tokens: 4096
     top_p: 0.9
     timeout_segundos: 300
 

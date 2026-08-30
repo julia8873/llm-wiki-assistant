@@ -10,6 +10,9 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_FILE="${ROOT_DIR}/config/config.yaml"
 
+# Evitar que Git Bash (MINGW64) convierta rutas como "/data" a rutas de Windows
+export MSYS_NO_PATHCONV=1
+
 ## @fn info()
 ## @brief Imprime un mensaje informativo estándar.
 ## @param $1 Mensaje de información a imprimir.
