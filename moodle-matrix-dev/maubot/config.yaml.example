@@ -26,7 +26,7 @@ plugin_config:
   gemini_base_url: "https://generativelanguage.googleapis.com/v1beta"
   gemini_model: "gemini-3.5-flash"
 
-  ollama_base_url: "http://ollama-llm-service:11434"
+  ollama_base_url: "http://ollama-llm-service:<OLLAMA_PORT>"
   ollama_model: "llama3"
 
   moodle_api_url: "http://moodle-matrix-dev-moodle-1:8000"

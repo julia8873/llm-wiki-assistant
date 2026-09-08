@@ -51,9 +51,9 @@ servicios:
   llm_server_opcional:
     activar_perfil_ollama_local: false
     nombre_contenedor: "ollama-llm-service"
-    puerto_host: 11434
-    puerto_contenedor: 11434
-    url_base: "http://localhost:11434"
+    puerto_host: <OLLAMA_PORT>
+    puerto_contenedor: <OLLAMA_PORT>
+    url_base: "http://localhost:<OLLAMA_PORT>"
 
 git:
   # Proveedor activo: "github", "gitlab" o "self_hosted"
@@ -86,9 +86,9 @@ git:
 
 llm:
   # Proveedor activo: "openai", "gemini", "ollama" o "ugr"
-  # Para UGR: requiere tunel SSH activo: ssh -L 0.0.0.0:11434:iaceprud.ugr.es:11434 julia@devceprud.ugr.es -p 24134
   proveedor_activo: "ollama"
 
+  # Para UGR: requiere tunel SSH activo: ssh -L 0.0.0.0:<OLLAMA_PORT>:iaceprud.ugr.es:<OLLAMA_PORT> julia@devceprud.ugr.es -p 24134
   openai:
     modelo_defecto: "gpt-4o-mini"
     api_key: "API_KEY_CHANGE_ME"
@@ -111,7 +111,7 @@ llm:
 
   ollama:
     modelo_defecto: "qwen3.6:35b-a3b"
-    api_base_url: "http://host.docker.internal:11434/v1"
+    api_base_url: "http://host.docker.internal:<OLLAMA_PORT>/v1"
     api_key_env_var: "OLLAMA_API_KEY_DUMMY"
     api_key: "ollama"
     temperatura: 0.2

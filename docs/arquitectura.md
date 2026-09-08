@@ -104,4 +104,4 @@ Las credenciales reales dependerán del proveedor que tengas activo (por ejemplo
 | **Backup** | N/A | N/A | - | Cron para dumps diarios (Fase 9.2). |
 | **GitHub** (Activo por defecto) | N/A | N/A | `GITHUB_PAT` | El `pat_env_var` configurado en `config.yaml`. |
 | **GitLab** | N/A | N/A | `GITLAB_TOKEN` (ejemplo) | Se usaría si `git.proveedor_activo` = `gitlab`. |
-| **Ollama** | 11434 | 11434 | `OLLAMA_API_KEY_DUMMY` | **Opcional**, requiere `./instalar.sh up --ollama`. |
+| **Ollama** | <OLLAMA_PORT> | <OLLAMA_PORT> | `OLLAMA_API_KEY_DUMMY` | **Opcional**, requiere `./instalar.sh up --ollama`. |

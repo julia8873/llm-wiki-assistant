@@ -356,7 +356,7 @@ print_summary() {
   
   cd "${ROOT_DIR}/moodle-matrix-dev" || true
   if docker compose ps --services --filter "status=running" 2>/dev/null | grep -q "ollama"; then
-    echo "Ollama      http://localhost:${LLM_SERVER_OPCIONAL_PUERTO_HOST:-11434}          (Perfil Activo)"
+    echo "Ollama      http://localhost:${LLM_SERVER_OPCIONAL_PUERTO_HOST:-<OLLAMA_PORT>}          (Perfil Activo)"
   else
     echo "Ollama      -                                (Inactivo. Usa --ollama para levantar)"
   fi
