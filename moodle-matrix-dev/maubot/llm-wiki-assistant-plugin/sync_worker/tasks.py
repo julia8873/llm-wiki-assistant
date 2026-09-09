@@ -254,7 +254,33 @@ async def _async_log_interaccion_unificada_task(matrix_room_id: str, repo_alumno
                             break
             
             if not already_logged:
-                # Escribir y comitear
+                # ================================================================
+                # DOBLE BARRERA PII — verificación PRE-COMMIT
+                # Re-ejecutar Presidio sobre cada campo de texto del payload final
+                # para confirmar que NO queda ninguna entidad PII sin tokenizar.
+                # Si se detecta alguna, se aborta aquí: el commit NUNCA se crea.
+                # ================================================================
+                from pii_guard import pseudonymize_text as _pii_check
+                _text_fields = {
+                    k: v for k, v in log_data.items()
+                    if isinstance(v, str) and k in ("mensaje_alumno", "respuesta_bot")
+                }
+                for _field, _value in _text_fields.items():
+                    _, _residual = _pii_check(_value)
+                    if _residual:
+                        _leaked_types = [m["entity_type"] for m in _residual]
+                        logger.error(
+                            f"FAIL-SAFE doble barrera: campo '{_field}' contiene "
+                            f"entidades PII sin tokenizar: {_leaked_types}. "
+                            f"Abortando antes de git-commit."
+                        )
+                        raise RuntimeError(
+                            f"FAIL-SAFE: PII detectado tras primera pasada en "
+                            f"campo '{_field}' ({_leaked_types}). Commit abortado."
+                        )
+                # ================================================================
+
+                # Escribir y comitear (solo si pasa la doble barrera)
                 with open(log_path, "a", encoding="utf-8") as f:
                     f.write(line_str + "\n")
                 

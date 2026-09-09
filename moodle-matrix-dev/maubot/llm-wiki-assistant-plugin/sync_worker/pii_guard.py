@@ -45,51 +45,86 @@ def get_anonymizer():
         _anonymizer = AnonymizerEngine()
     return _anonymizer
 
+import re as _re
+
+# Patrón que reconoce cualquier token de pseudonimización ya existente, p.ej. [PERSON_1]
+_TOKEN_RE = _re.compile(r'\[[A-Z_]+_\d+\]')
+# Placeholder neutro que SpaCy no identifica como entidad PII
+_TOKEN_PLACEHOLDER = "XXXXXXXX"
+
 def pseudonymize_text(text: str) -> Tuple[str, List[Dict[str, str]]]:
     """
     Detects and pseudonymizes PII in the given text.
     Returns a tuple of (pseudonymized_text, mappings)
     Where mappings is a list of dicts: {"token": str, "raw_value": str, "entity_type": str}
+
+    Tokens already present in the text (e.g. [PERSON_1] from a previous pass)
+    are temporarily masked before analysis so SpaCy does not re-detect them
+    as PII — preventing false positives in the double-barrier check.
     """
     if not text:
         return text, []
 
     analyzer = get_analyzer()
-    anonymizer = get_anonymizer()
 
-    # We use "es" as default because it's a Spanish course, but could use "en" if needed.
-    # We will run both or just "es". Let's run "es".
-    results = analyzer.analyze(text=text, entities=["PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER", "LOCATION", "ES_NIF_NIE"], language="es")
-    
+    # ── Pre-procesado: enmascarar tokens existentes ────────────────────────
+    # Guardar las posiciones y valores originales de los tokens ya presentes
+    existing_tokens = []
+    masked_text = text
+    offset = 0
+    for m in _TOKEN_RE.finditer(text):
+        start = m.start() + offset
+        end = m.end() + offset
+        original = m.group()
+        # Sustituir por placeholder de la misma longitud para no desplazar índices
+        placeholder = _TOKEN_PLACEHOLDER[:len(original)].ljust(len(original), 'X')
+        masked_text = masked_text[:start] + placeholder + masked_text[end:]
+        existing_tokens.append((start, start + len(placeholder), original))
+        # offset no cambia porque reemplazamos exactamente la misma longitud
+    # ──────────────────────────────────────────────────────────────────────
+
+    results = analyzer.analyze(
+        text=masked_text,
+        entities=["PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER", "LOCATION", "ES_NIF_NIE"],
+        language="es"
+    )
+
+    # Filtrar cualquier detección que caiga dentro de las posiciones de tokens existentes
+    token_ranges = [(s, e) for (s, e, _) in existing_tokens]
+    def _overlaps_existing(res) -> bool:
+        for (ts, te) in token_ranges:
+            if res.start < te and res.end > ts:
+                return True
+        return False
+
+    results = [r for r in results if not _overlaps_existing(r)]
+
     if not results:
         return text, []
 
-    # Sort results by start index descending to replace from end to start without messing up indices
+    # Sort by start index descending to replace from end to start
     results = sorted(results, key=lambda x: x.start, reverse=True)
-    
+
     mappings = []
-    # To generate unique tokens like [PERSON_1], [PERSON_2]
     counters = {}
-    
-    # We will build the anonymized text manually or let Presidio do it and then extract mappings.
-    # It's easier to do it manually to map exactly which raw_value became which token.
-    anonymized_text = text
-    
+    anonymized_text = text  # Trabajar sobre el texto ORIGINAL (con tokens, no enmascarado)
+
     for res in results:
         entity_type = res.entity_type
+        # Extraer el raw_value del texto original (no del enmascarado)
         raw_value = text[res.start:res.end]
-        
+
         counters[entity_type] = counters.get(entity_type, 0) + 1
         token = f"[{entity_type}_{counters[entity_type]}]"
-        
+
         mappings.append({
             "token": token,
             "raw_value": raw_value,
             "entity_type": entity_type
         })
-        
+
         anonymized_text = anonymized_text[:res.start] + token + anonymized_text[res.end:]
-        
+
     return anonymized_text, mappings
 
 def send_pii_to_vault(student_matrix_id: str, interaction_id: str, mappings: List[Dict[str, str]]):
