@@ -204,6 +204,7 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - INTERNAL_SERVICE_TOKEN=${INTERNAL_SERVICE_TOKEN}
+      - MAPEO_API_URL=http://moodle-matrix-dev-mapeo-api-1:8000
       - PYTHONPATH=/data/llm-wiki-assistant-plugin:/shared-pkg
     volumes:
       - ./maubot:/data
@@ -226,6 +227,7 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - INTERNAL_SERVICE_TOKEN=${INTERNAL_SERVICE_TOKEN}
+      - MAPEO_API_URL=http://moodle-matrix-dev-mapeo-api-1:8000
       - PYTHONPATH=/data/llm-wiki-assistant-plugin:/shared-pkg
     volumes:
       - ./maubot:/data
