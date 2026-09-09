@@ -7,6 +7,7 @@ import asyncio
 import logging
 import httpx
 from git_utils import asegurar_repo_local, run_git_command, asegurar_estructura_okf, distributed_repo_lock
+from sync_worker.pii_guard import pseudonymize_text, send_pii_to_vault, verify_no_pii_residual
 from shared_pkg.okf_contract import COMMIT_MSG_SYNC, PATH_LOG_INTERACCIONES, COMMIT_MSG_LOG
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
@@ -216,7 +217,6 @@ async def _async_log_interaccion_unificada_task(matrix_room_id: str, repo_alumno
             log_path = os.path.join(destino_local, PATH_LOG_INTERACCIONES, f"{fecha}.jsonl")
             
             # --- PII Guard Integration ---
-            from pii_guard import pseudonymize_text, send_pii_to_vault
             
             # Use same interaction_id generation as metrics-api
             interaction_id = hashlib.sha256(iso_timestamp.encode()).hexdigest()[:16]
@@ -259,7 +259,6 @@ async def _async_log_interaccion_unificada_task(matrix_room_id: str, repo_alumno
                 # Re-ejecutar Presidio sobre los campos finales antes de git-add.
                 # Lanza RuntimeError si detecta PII sin tokenizar → commit abortado.
                 # ================================================================
-                from pii_guard import verify_no_pii_residual
                 verify_no_pii_residual(log_data)
                 # ================================================================
 
