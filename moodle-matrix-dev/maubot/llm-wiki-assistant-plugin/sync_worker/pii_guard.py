@@ -165,3 +165,34 @@ def send_pii_to_vault(student_matrix_id: str, interaction_id: str, mappings: Lis
         logger.error(f"Failed to send PII to vault: {e}")
         # We must fail the commit flow if we can't secure the PII
         raise RuntimeError("Fail-safe: Could not store PII securely, aborting sync.") from e
+
+
+def verify_no_pii_residual(
+    log_data: dict,
+    fields: tuple = ("mensaje_alumno", "respuesta_bot")
+) -> None:
+    """
+    DOBLE BARRERA — re-ejecutar Presidio sobre los campos de texto del payload
+    final para confirmar que NO queda ninguna entidad PII sin tokenizar.
+
+    Llamar ANTES de git-add/commit. Si se detecta cualquier entidad,
+    se lanza RuntimeError y el commit nunca llega a crearse en local.
+
+    Esta función es pura y testeable de forma aislada.
+    """
+    for field in fields:
+        value = log_data.get(field)
+        if not isinstance(value, str) or not value:
+            continue
+        _, residual = pseudonymize_text(value)
+        if residual:
+            leaked_types = [m["entity_type"] for m in residual]
+            logger.error(
+                f"FAIL-SAFE doble barrera: campo '{field}' contiene "
+                f"entidades PII sin tokenizar: {leaked_types}. "
+                f"Abortando antes de git-commit."
+            )
+            raise RuntimeError(
+                f"FAIL-SAFE: PII detectado en campo '{field}' "
+                f"({leaked_types}). Commit abortado."
+            )
