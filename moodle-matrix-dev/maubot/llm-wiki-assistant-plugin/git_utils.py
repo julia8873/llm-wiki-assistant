@@ -77,6 +77,44 @@ async def run_git_command(*args, cwd=None):
     """!
     @brief Ejecuta un comando git de forma asíncrona.
     """
+    if args and args[0] == 'push':
+        # --- Doble barrera de seguridad: evitar push de tokens ---
+        import re
+        # List of regexes for common Git provider tokens
+        token_patterns = [
+            r"ghp_[a-zA-Z0-9]{36}", # GitHub Personal Access Token
+            r"github_pat_[a-zA-Z0-9_]{82}", # GitHub Fine-grained PAT
+            r"glpat-[a-zA-Z0-9\-]{20,}", # GitLab Personal Access Token
+        ]
+        
+        # Check what is about to be pushed
+        # Typically origin/main..HEAD or origin/master..HEAD
+        # We try to get the diff. If upstream is not set, we just check HEAD.
+        diff_proc = await asyncio.create_subprocess_exec(
+            'git', 'log', '-p', 'origin/main..HEAD',
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=cwd
+        )
+        diff_out, diff_err = await diff_proc.communicate()
+        
+        # Also check just the latest commit to be safe, in case origin/main tracking is weird
+        diff_proc_last = await asyncio.create_subprocess_exec(
+            'git', 'show', 'HEAD',
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=cwd
+        )
+        diff_out_last, diff_err_last = await diff_proc_last.communicate()
+        
+        combined_diff = diff_out.decode(errors='ignore') + "\n" + diff_out_last.decode(errors='ignore')
+        
+        for pattern in token_patterns:
+            if re.search(pattern, combined_diff):
+                logger.error(f"FAIL-SAFE: Detectado posible token vivo (patrón: {pattern}) en el diff a punto de ser pusheado. Abortando push.")
+                raise RuntimeError("FAIL-SAFE: No se puede hacer push porque se detectó un posible token de GitHub/GitLab en el código.")
+        # --------------------------------------------------------
+
     process = await asyncio.create_subprocess_exec(
         'git', *args,
         stdout=asyncio.subprocess.PIPE,

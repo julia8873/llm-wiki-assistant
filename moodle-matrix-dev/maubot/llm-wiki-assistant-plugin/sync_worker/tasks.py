@@ -215,6 +215,30 @@ async def _async_log_interaccion_unificada_task(matrix_room_id: str, repo_alumno
 
             log_path = os.path.join(destino_local, PATH_LOG_INTERACCIONES, f"{fecha}.jsonl")
             
+            # --- PII Guard Integration ---
+            from pii_guard import pseudonymize_text, send_pii_to_vault
+            
+            # Use same interaction_id generation as metrics-api
+            interaction_id = hashlib.sha256(iso_timestamp.encode()).hexdigest()[:16]
+            student_matrix_id = log_data.get("sender", matrix_room_id) # sender might be the user id, fallback to room id
+            
+            all_mappings = []
+            
+            if "mensaje_alumno" in log_data and log_data["mensaje_alumno"]:
+                anon_msg, mappings = pseudonymize_text(log_data["mensaje_alumno"])
+                log_data["mensaje_alumno"] = anon_msg
+                all_mappings.extend(mappings)
+                
+            if "respuesta_bot" in log_data and log_data["respuesta_bot"]:
+                anon_resp, mappings = pseudonymize_text(log_data["respuesta_bot"])
+                log_data["respuesta_bot"] = anon_resp
+                all_mappings.extend(mappings)
+                
+            if all_mappings:
+                # This will raise exception and abort sync if it fails
+                send_pii_to_vault(student_matrix_id, interaction_id, all_mappings)
+            # ---------------------------
+            
             # Serializar la entrada para hacer el append
             line_str = json.dumps(log_data, ensure_ascii=False)
             
