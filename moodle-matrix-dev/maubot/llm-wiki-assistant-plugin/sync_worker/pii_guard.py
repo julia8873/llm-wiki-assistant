@@ -85,7 +85,7 @@ def pseudonymize_text(text: str) -> Tuple[str, List[Dict[str, str]]]:
 
     results = analyzer.analyze(
         text=masked_text,
-        entities=["PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER", "LOCATION", "ES_NIF_NIE"],
+        entities=["PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER", "ES_NIF_NIE"],
         language="es"
     )
 
