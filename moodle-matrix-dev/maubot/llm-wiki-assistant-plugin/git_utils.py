@@ -91,7 +91,7 @@ async def run_git_command(*args, cwd=None):
         # Typically origin/main..HEAD or origin/master..HEAD
         # We try to get the diff. If upstream is not set, we just check HEAD.
         diff_proc = await asyncio.create_subprocess_exec(
-            'git', 'log', '-p', 'origin/main..HEAD',
+            'git', 'log', '-p', 'origin/HEAD..HEAD',
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             cwd=cwd

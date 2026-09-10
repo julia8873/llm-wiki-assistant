@@ -139,11 +139,9 @@ def send_pii_to_vault(student_matrix_id: str, interaction_id: str, mappings: Lis
     if not internal_token:
         raise ValueError("INTERNAL_SERVICE_TOKEN not configured for PII guard.")
 
-    # Using MAPEO_API_URL or a new internal endpoint for metrics-api.
-    # By default, MAPEO_API_URL points to bdc-trazabilidad metrics-api.
-    metrics_api_url = os.getenv("MAPEO_API_URL")
+    metrics_api_url = os.getenv("METRICS_API_URL", "http://bdc-trazabilidad-metrics-api-1:8000")
     if not metrics_api_url:
-        raise ValueError("MAPEO_API_URL not configured for PII guard.")
+        raise ValueError("METRICS_API_URL not configured for PII guard.")
         
     endpoint = f"{metrics_api_url.rstrip('/')}/internal/pii/vault"
     

@@ -146,6 +146,9 @@ services:
         condition: service_healthy
       pgvector:
         condition: service_healthy
+    networks:
+      - default
+      - bdc-net
 
   pgvector:
     image: pgvector/pgvector:pg16
@@ -213,6 +216,9 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+    networks:
+      - default
+      - bdc-net
 
   sync-worker-2:
     build:
@@ -236,6 +242,9 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+    networks:
+      - default
+      - bdc-net
 
   backup:
     build:

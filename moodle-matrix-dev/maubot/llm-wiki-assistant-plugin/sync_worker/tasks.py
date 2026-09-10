@@ -101,7 +101,7 @@ async def _async_sync_repo_task(matrix_room_id: str, repo_alumno_url: str, offic
                 return
 
             # 7. Git push
-            code, out, err = await run_git_command('push', 'origin', 'main', cwd=destino_local)
+            code, out, err = await run_git_command('push', 'origin', 'HEAD', cwd=destino_local)
             if code != 0:
                 raise RuntimeError(f"Error en git push: {err}")
                 
@@ -171,7 +171,7 @@ async def _async_init_teacher_repo_task(matrix_room_id: str, official_repo_url: 
                 return
 
             # 5. Git push
-            code, out, err = await run_git_command('push', 'origin', 'main', cwd=destino_local)
+            code, out, err = await run_git_command('push', 'origin', 'HEAD', cwd=destino_local)
             if code != 0:
                 raise RuntimeError(f"Error en git push: {err}")
 
@@ -274,7 +274,7 @@ async def _async_log_interaccion_unificada_task(matrix_room_id: str, repo_alumno
                 logger.info(f"Entrada de log ya presente (idempotencia). Se omite escritura y commit local.")
 
             # Hacer push independientemente de si se escribió ahora o ya estaba en el tree local
-            code, out, err = await run_git_command('push', 'origin', 'main', cwd=destino_local)
+            code, out, err = await run_git_command('push', 'origin', 'HEAD', cwd=destino_local)
             if code != 0:
                 raise RuntimeError(f"Error en git push de logs: {err}")
                 
