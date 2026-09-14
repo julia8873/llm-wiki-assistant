@@ -245,8 +245,8 @@ generate_env() {
   
   info "Generando/Actualizando ${env_file} a partir de config.yaml..."
   
-  # Bloque dinámico
-  echo "# === BLOQUE GENERADO AUTOMÁTICAMENTE DESDE config.yaml ===" > "${env_file}.tmp"
+  # Extraer OLLAMA_PORT del raíz e inyectarlo arriba del todo para que Docker Compose lo procese bien
+  echo "# === BLOQUE GENERADO AUTOMÁTICAMENTE DESDE config.yaml ===" >> "${env_file}.tmp"
   awk -F': ' '
     /^  [a-zA-Z_]+:/ { section=toupper($1); gsub(/ |:/, "", section) }
     /^    [a-zA-Z_]+:/ { key=toupper($1); gsub(/ |:/, "", key); val=$2; gsub(/"/, "", val); print section"_"key"="val }

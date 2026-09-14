@@ -79,7 +79,7 @@ class OpenAICompatibleClient(LLMClient):
         
         if not embedding_model:
             embedding_model = "text-embedding-3-small"
-            if "localhost" in self.api_base_url or "<OLLAMA_PORT>" in self.api_base_url or "host.docker.internal" in self.api_base_url:
+            if "localhost" in self.api_base_url or "${OLLAMA_PORT}" in self.api_base_url or "host.docker.internal" in self.api_base_url:
                 embedding_model = "nomic-embed-text" # Typical for Ollama
             
         if "groq.com" in self.api_base_url:

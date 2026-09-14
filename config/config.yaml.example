@@ -51,9 +51,9 @@ servicios:
   llm_server_opcional:
     activar_perfil_ollama_local: false
     nombre_contenedor: "ollama-llm-service"
-    puerto_host: <OLLAMA_PORT>
-    puerto_contenedor: <OLLAMA_PORT>
-    url_base: "http://localhost:<OLLAMA_PORT>"
+    puerto_host: ${OLLAMA_PORT}
+    puerto_contenedor: ${OLLAMA_PORT}
+    url_base: "http://localhost:${OLLAMA_PORT}"
 
 git:
   # Proveedor activo: "github", "gitlab" o "self_hosted"
@@ -111,7 +111,7 @@ llm:
   ollama:
     modelo_defecto: "qwen3.6:35b-a3b"
     modelo_embedding: "nomic-embed-text"
-    api_base_url: "http://host.docker.internal:<OLLAMA_PORT>/v1"
+    api_base_url: CHANGE_ME
     api_key_env_var: "OLLAMA_API_KEY_DUMMY"
     api_key: "ollama"
     temperatura: 0.2
