@@ -51,6 +51,7 @@ Copiar .env.example y rellenar los valores.
    - `git.proveedor_activo` y `git.organizacion`: Tu proveedor para crear los repositorios de alumnos (GitHub, GitLab, etc).
    - `git.github.pat`: Tu token personal si usas GitHub (con permisos de `repo`).
    - `llm.proveedor_activo`: Indica el motor de IA (`openai`, `gemini`, `ollama`).
+   - Cambiar la variable api_base_url 
 
 ### Paso 3: Aplicar Configuración
 Una vez hayas introducido tus tokens y claves, vuelve a lanzar el orquestador. Aplicará los cambios en todo el sistema:
