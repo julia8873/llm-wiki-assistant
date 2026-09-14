@@ -88,7 +88,6 @@ llm:
   # Proveedor activo: "openai", "gemini", "ollama" o "ugr"
   proveedor_activo: "ollama"
 
-  # Para UGR: requiere tunel SSH activo: ssh -L 0.0.0.0:<OLLAMA_PORT>:iaceprud.ugr.es:<OLLAMA_PORT> julia@devceprud.ugr.es -p 24134
   openai:
     modelo_defecto: "gpt-4o-mini"
     api_key: "API_KEY_CHANGE_ME"
@@ -111,6 +110,7 @@ llm:
 
   ollama:
     modelo_defecto: "qwen3.6:35b-a3b"
+    modelo_embedding: "nomic-embed-text"
     api_base_url: "http://host.docker.internal:<OLLAMA_PORT>/v1"
     api_key_env_var: "OLLAMA_API_KEY_DUMMY"
     api_key: "ollama"
