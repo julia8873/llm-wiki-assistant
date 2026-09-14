@@ -35,21 +35,19 @@ Para dar servicio desde fuera, se recomienda configurar proxy inverso (nginx, tr
 TODO: Describir los archivos de configuración de las carpetas y servicios
 
 
-### Paso 1: Levantar el entorno base
-Ejecuta el script principal por primera vez. Levantará la infraestructura inicial e imprimirá un panel interactivo con las credenciales que faltan por configurar.
+
+### Paso 1: Copiar los ficheros de entorno
+Copiar .env.example y rellenar los valores.
+(Si se va a usar ollama, cambiar OLLAMA_PORT=puerto_Ollama_CHANGE_ME y llm-wiki-assistant/moodle-matrix-dev/.env modificar OLLAMA_PORT)
+
+
 ```bash
 ./instalar.sh
 ```
 
 ### Paso 2: Completar Credenciales
-Al finalizar el paso anterior, los contenedores estarán operativos pero requerirán tus claves. Copia y edita los archivos (el script te indicará cuáles faltan en el panel `ACCIÓN REQUERIDA`):
 
-1. **`moodle-matrix-dev/.env`**:
-   - `OPENAI_API_KEY` o `GEMINI_API_KEY`: Clave de tu proveedor de IA (desde OpenAI Platform o Google AI Studio).
-   - `MATRIX_ACCESS_TOKEN`: Token de administrador. Para obtenerlo, abre Element ([http://localhost:8081](http://localhost:8081)), inicia sesión con las credenciales por defecto (`admin` / `adminpass123`), ve a **Ajustes -> Ayuda e información -> Avanzado -> Token de acceso** y cópialo.
-   - `MAPEO_API_TOKEN`: Puedes dejarlo en `changeme` para que el script inyecte un token seguro automáticamente.
-
-2. **`config/config.yaml`**:
+1. **`config/config.yaml`**:
    - `git.proveedor_activo` y `git.organizacion`: Tu proveedor para crear los repositorios de alumnos (GitHub, GitLab, etc).
    - `git.github.pat`: Tu token personal si usas GitHub (con permisos de `repo`).
    - `llm.proveedor_activo`: Indica el motor de IA (`openai`, `gemini`, `ollama`).
@@ -61,13 +59,11 @@ Una vez hayas introducido tus tokens y claves, vuelve a lanzar el orquestador. A
 ```
 
 ### Paso 4: Desplegar el Bot (Maubot)
-El script de instalación ya empaquetó tu bot, pero debes registrarlo en el motor de bots:
+
 1. Accede a [http://localhost:29317/_matrix/maubot/](http://localhost:29317/_matrix/maubot/) e inicia sesión (`admin` / tu `MAUBOT_ADMIN_PASSWORD`).
 2. **Plugins:** Sube el archivo local ubicado en `moodle-matrix-dev/maubot/llm-wiki-assistant-plugin/plugin.mbp`.
 3. **Clients:** Añade un cliente con User ID `@llm_wiki_bot:localhost`, Homeserver `http://synapse:8008`, y pega el **Token del bot** que te imprimió `./instalar.sh` en la consola (deja la contraseña en blanco).
 4. **Instances:** Crea una nueva instancia vinculando el Cliente y el Plugin que acabas de subir.
-
-¡Listo! El bot ya estará escuchando en la red Matrix para ser invitado automáticamente a las salas de los alumnos.
 
 ## Comandos Operativos Base (Desarrollo) {#comandos_base}
 
@@ -91,32 +87,10 @@ El script de instalación ya empaquetó tu bot, pero debes registrarlo en el mot
 ./instalar.sh --test [--full]
 ```
 
-> [!WARNING]
-> **Aviso de Seguridad en Producción (Element Web)**: Durante la fase de desarrollo e integración, se han desactivado los avisos de cifrado de extremo a extremo (E2EE) y de copias de seguridad de claves (`UIFeature.keyBackup` y `UIFeature.crossSigning`) en `moodle-matrix-dev/element-config.json` para facilitar las pruebas del bot LLM sin fricción. Antes de desplegar el entorno en producción, se debe evaluar si se requiere E2EE estricto y, en tal caso, volver a activar estas variables.
-
-## Funcionalidades del Bot en Matrix (OKF v0.1) {#funcionalidades_bot}
-El Bot LLM implementa una ingesta automatizada siguiendo el estándar OKF v0.1 (`AGENTS.md`). Cuando se le envía un archivo, el bot genera una abstracción completa en el repositorio, creando:
-- **Conceptos**: Conceptos abstractos extraídos.
-- **Entidades**: Herramientas o personas mencionadas.
-- **Recursos**: Resumen general del documento.
-
 **Comandos del chat disponibles para el alumno:**
 - **`!ayuda`** o **`!comandos`**: Despliega un menú informativo con los comandos.
 - **`!deshacer`** o **`!revertir`**: Revierte la última ingesta automática en Git de manera segura.
 - **`!sincronizar`** o **`!sync`**: Fuerza la actualización de tu repositorio con el material del profesor.
-
-## Credenciales de Prueba {#credenciales_prueba}
-
-Para probar el flujo de autenticación delegada (SSO) y la provisión de repositorios, se recomienda el uso de los siguientes usuarios de prueba (con los mismos datos de acceso en Moodle y Element):
-
-| Usuario | Contraseña | Rol / Propósito |
-|---------|------------|-----------------|
-| `admin` | `adminpass123` | Administrador de plataforma Moodle / Creador de plantillas |
-| `teacher1` | `Teacher1!` | Profesor del curso (gestión) |
-| `student1` | `Student1!` | Estudiante de prueba principal (Repo Alumno #1) |
-| `student2` | `Student2!` | Estudiante secundario para pruebas de concurrencia (Repo Alumno #2) |
-
-> **Nota:** Se aconseja utilizar pestañas en modo incógnito al alternar entre `student1` y `student2` para evitar que Element re-cargue sesiones guardadas previas (localStorage) e impida el acceso cruzado.
 
 ## Inventario de Componentes y Carpetas Clave {#inventario_componentes}
 
@@ -130,4 +104,5 @@ Para probar el flujo de autenticación delegada (SSO) y la provisión de reposit
 | `moodle-matrix-dev/maubot/llm-wiki-assistant-plugin/sync_worker/` | **(Fases 5.1 y 6)** Workers de RQ (Redis) encargados de la *Sincronización Ascendente* y el *Logging de Interacciones*. |
 | `moodle-matrix-dev/maubot/llm-wiki-assistant-plugin/git_utils.py` | Módulo compartido de utilidades Git usado concurrentemente por Ingesta OKF, Sync, y Logging. Contiene el *Distributed Repo Lock*. |
 | `moodle-matrix-dev/moodle_plugins/block_bdc/` | Plugin de Moodle que intercepta el inicio de sesión y llama a `mapeo-api`. |
+
 
