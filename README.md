@@ -21,6 +21,16 @@ Sistema integrado de docencia Moodle-Matrix-Git. Proporciona a cada estudiante u
 
 Sigue estos pasos para iniciar el proyecto. El orquestador principal te guiará durante el proceso y generará las plantillas de configuración automáticamente.
 
+### Paso 0: Servicios
+
+Los servicios que se deben levantar son: Moodle para el CMS y MariaDB, Matrix(Synapse) y Element para de chat. Si los servicios no están desplegados en un entorno, se puede usar el docker-compose.yml disponible en la carpeta: 
+   moodle-matrix-dev 
+donde hay un docker-compose.yml que levanta dichos servicios en contenedores. 
+
+Para dar servicio desde fuera, se recomienda configurar proxy inverso (nginx, traefic, caddy, etc.) que securice la conexión y derive el tráfico al mapeo de puerto del contenedor correspondiente. 
+   TODO: Vea ejemplos de configuración en la carpeta /reverse-proxy-confs
+
+
 ### Paso 1: Levantar el entorno base
 Ejecuta el script principal por primera vez. Levantará la infraestructura inicial e imprimirá un panel interactivo con las credenciales que faltan por configurar.
 ```bash
