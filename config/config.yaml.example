@@ -85,7 +85,7 @@ git:
     token_env_var: "GIT_SELF_HOSTED_TOKEN"
 
 llm:
-  # Proveedor activo: "openai", "gemini", "ollama" o "ugr"
+  # Proveedor activo: "openai", "gemini", "ollama"
   proveedor_activo: "ollama"
 
   openai:
