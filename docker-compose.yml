@@ -1,5 +1,284 @@
 services:
-  db:
-    image: postgres:15
+  mariadb:
+    image: mariadb:10.11
+    container_name: ${MARIADB_NOMBRE_CONTENEDOR}
+    environment:
+      - MARIADB_USER=${MARIADB_USER}
+      - MARIADB_PASSWORD=${MARIADB_PASSWORD}
+      - MARIADB_DATABASE=${MARIADB_DATABASE}
+      - MARIADB_ROOT_PASSWORD=${MARIADB_ROOT_PASSWORD}
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  moodle:
+    build:
+      context: ./src/moodle
+      dockerfile: Dockerfile
+    container_name: ${MOODLE_NOMBRE_CONTENEDOR}
+    ports:
+      - "${MOODLE_PUERTO_HOST}:${MOODLE_PUERTO_CONTENEDOR}"
+    environment:
+      - MOODLE_DATABASE_HOST=mariadb
+      - MOODLE_DATABASE_PORT_NUMBER=3306
+      - MOODLE_DATABASE_USER=${MARIADB_USER}
+      - MOODLE_DATABASE_PASSWORD=${MARIADB_PASSWORD}
+      - MOODLE_DATABASE_NAME=${MARIADB_DATABASE}
+      - MOODLE_USERNAME=${MOODLE_USERNAME}
+      - MOODLE_PASSWORD=${MOODLE_PASSWORD}
+      - MOODLE_EMAIL=${MOODLE_EMAIL}
+      - MOODLE_SITE_NAME=LLM Wiki Assistant Moodle
+      - MOODLE_HOST=localhost:${MOODLE_PUERTO_HOST}
+      - MAPEO_API_TOKEN=${MAPEO_API_TOKEN}
+      - MATRIX_ACCESS_TOKEN=${MATRIX_ACCESS_TOKEN}
+      - SYNAPSE_URL_INTERNA=http://synapse:8008
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    volumes:
+      - moodle_data:/bitnami/moodle
+      - moodledata_data:/bitnami/moodledata
+      - ./src/moodle/block_bdc:/moodle-custom-plugin
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/8080'"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 180s
+    networks:
+      - default
+      - bdc-net
+
+  synapse:
+    image: matrixdotorg/synapse:latest
+    container_name: ${SYNAPSE_NOMBRE_CONTENEDOR}
+    ports:
+      - "${SYNAPSE_PUERTO_HOST}:${SYNAPSE_PUERTO_CONTENEDOR}"
+    environment:
+      - SYNAPSE_SERVER_NAME=localhost
+      - SYNAPSE_REPORT_STATS=no
+      - PYTHONPATH=/data
+    volumes:
+      - ./src/matrix/synapse-data:/data
+      - ./src/matrix/synapse-custom/rest_auth_provider.py:/data/rest_auth_provider.py:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8008/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  element:
+    image: vectorim/element-web:latest
+    container_name: ${ELEMENT_NOMBRE_CONTENEDOR}
+    ports:
+      - "${ELEMENT_PUERTO_HOST}:${ELEMENT_PUERTO_CONTENEDOR}"
+    volumes:
+      - ./src/matrix/element/config.json:/app/config.json:ro
+      - ./src/matrix/element/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+    depends_on:
+      synapse:
+        condition: service_healthy
+
+  mapeo-api:
+    build:
+      context: ./src/api
+    container_name: ${MAPEO_API_NOMBRE_CONTENEDOR}
+    environment:
+      - MAPEO_API_TOKEN=${MAPEO_API_TOKEN}
+      - GITHUB_PAT=${GITHUB_PAT}
+      - DATABASE_URL=${DATABASE_URL}
+    volumes:
+      - mapeo_api_data:/data
+      - ./config:/config:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - default
+      - bdc-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${MAPEO_API_PUERTO_CONTENEDOR}/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: moodle-matrix-dev-postgres-1
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    networks:
+      - default
+      - bdc-net
+    volumes:
+      - postgres_api_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  maubot:
+    build:
+      context: ./src/bot
+      dockerfile: Dockerfile
+    container_name: ${MAUBOT_NOMBRE_CONTENEDOR}
+    environment:
+      - MAPEO_API_TOKEN=${MAPEO_API_TOKEN}
+      - GITHUB_PAT=${GITHUB_PAT}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - PYTHONPATH=/shared-pkg
+    ports:
+      - "${MAUBOT_PUERTO_HOST}:${MAUBOT_PUERTO_CONTENEDOR}"
+    volumes:
+      - ./src/bot:/data
+      - ./config:/config:ro
+      - ./src/shared:/shared-pkg:ro
+    depends_on:
+      synapse:
+        condition: service_healthy
+      pgvector:
+        condition: service_healthy
+    networks:
+      - default
+      - bdc-net
+
+  pgvector:
+    image: pgvector/pgvector:pg16
+    container_name: moodle-matrix-dev-pgvector-1
+    environment:
+      POSTGRES_USER: llm_wiki
+      POSTGRES_PASSWORD: llm_wiki_pass
+      POSTGRES_DB: vector_store
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgvector_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U llm_wiki -d vector_store"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ${LLM_SERVER_OPCIONAL_NOMBRE_CONTENEDOR}
+    profiles:
+      - ollama
+    ports:
+      - "${LLM_SERVER_OPCIONAL_PUERTO_HOST}:${LLM_SERVER_OPCIONAL_PUERTO_CONTENEDOR}"
+    volumes:
+      - ollama_data:/root/.ollama
+
   redis:
     image: redis:7
+    container_name: moodle-matrix-dev-redis-1
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    networks:
+      - default
+      - bdc-net
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  sync-worker-1:
+    build:
+      context: ./src/bot
+      dockerfile: Dockerfile
+    container_name: moodle-matrix-dev-sync-worker-1
+    working_dir: /data/llm-wiki-assistant-plugin
+    command: ["rq", "worker", "sync-jobs", "log-jobs", "--url", "redis://redis:6379"]
+    environment:
+      - MAPEO_API_TOKEN=${MAPEO_API_TOKEN}
+      - GITHUB_PAT=${GITHUB_PAT}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - INTERNAL_SERVICE_TOKEN=${INTERNAL_SERVICE_TOKEN}
+      - MAPEO_API_URL=http://moodle-matrix-dev-mapeo-api-1:8000
+      - PYTHONPATH=/data/llm-wiki-assistant-plugin:/shared-pkg
+    volumes:
+      - ./src/bot:/data
+      - ./config:/config:ro
+      - ./src/shared:/shared-pkg:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - default
+      - bdc-net
+
+  sync-worker-2:
+    build:
+      context: ./src/bot
+      dockerfile: Dockerfile
+    container_name: moodle-matrix-dev-sync-worker-2
+    working_dir: /data/llm-wiki-assistant-plugin
+    command: ["rq", "worker", "sync-jobs", "log-jobs", "--url", "redis://redis:6379"]
+    environment:
+      - MAPEO_API_TOKEN=${MAPEO_API_TOKEN}
+      - GITHUB_PAT=${GITHUB_PAT}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - INTERNAL_SERVICE_TOKEN=${INTERNAL_SERVICE_TOKEN}
+      - MAPEO_API_URL=http://moodle-matrix-dev-mapeo-api-1:8000
+      - PYTHONPATH=/data/llm-wiki-assistant-plugin:/shared-pkg
+    volumes:
+      - ./src/bot:/data
+      - ./config:/config:ro
+      - ./src/shared:/shared-pkg:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - default
+      - bdc-net
+
+  backup:
+    build:
+      context: ./src/backup
+    container_name: moodle-matrix-dev-backup-1
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    volumes:
+      - ./scripts:/scripts:ro
+      - ./backups:/backups
+      - redis_data:/redis_data:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "ps", "aux", "|", "grep", "[c]rond"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  mariadb_data:
+  moodle_data:
+  moodledata_data:
+  ollama_data:
+  mapeo_api_data:
+  postgres_api_data:
+  pgvector_data:
+  redis_data:
+
+networks:
+  bdc-net:
+    external: true

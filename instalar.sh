@@ -181,12 +181,12 @@ cmd_install_all() {
   echo "--- Fase: Configuración Base y Secretos ---"
   copy_if_missing "${ROOT_DIR}/.env.example"                                      "${ROOT_DIR}/.env"
   copy_if_missing "${ROOT_DIR}/config/config.yaml.example"                        "${ROOT_DIR}/config/config.yaml"
-  copy_if_missing "${ROOT_DIR}/moodle-matrix-dev/maubot/base-config.yaml.example" "${ROOT_DIR}/moodle-matrix-dev/maubot/base-config.yaml"
-  copy_if_missing "${ROOT_DIR}/moodle-matrix-dev/maubot/config.yaml.example"      "${ROOT_DIR}/moodle-matrix-dev/maubot/config.yaml"
+  copy_if_missing "${ROOT_DIR}/src/bot/base-config.yaml.example" "${ROOT_DIR}/src/bot/base-config.yaml"
+  copy_if_missing "${ROOT_DIR}/src/bot/config.yaml.example"      "${ROOT_DIR}/src/bot/config.yaml"
   echo ""
 
   echo "--- Fase: Stack Docker ---"
-  copy_if_missing "${ROOT_DIR}/moodle-matrix-dev/.env.example" "${ROOT_DIR}/moodle-matrix-dev/.env"
+  copy_if_missing "${ROOT_DIR}/.env.example" "${ROOT_DIR}/.env"
   cmd_up "$@"
   echo ""
 
@@ -240,8 +240,8 @@ cmd_docs() {
 ### @fn generate_env()
 ## @brief Genera el fichero .env combinando config.yaml y .env.example
 generate_env() {
-  local env_file="${ROOT_DIR}/moodle-matrix-dev/.env"
-  local example_file="${ROOT_DIR}/moodle-matrix-dev/.env.example"
+  local env_file="${ROOT_DIR}/.env"
+  local example_file="${ROOT_DIR}/.env.example"
   
   info "Generando/Actualizando ${env_file} a partir de config.yaml..."
   
@@ -321,7 +321,7 @@ generate_env() {
   if [[ -n "$m_pass" || -n "$m_key" ]]; then
     info "Inyectando credenciales en Maubot..."
     check_docker
-    docker run --rm -v "${ROOT_DIR}/moodle-matrix-dev/maubot:/data" alpine sh -c "
+    docker run --rm -v "${ROOT_DIR}/src/bot:/data" alpine sh -c "
       if [ -n \"$m_pass\" ]; then
         sed -i -e \"s|root: ''|admin: \\\"${m_pass}\\\"|\" -e \"s|admin: \\\"CHANGE_ME_PASSWORD\\\"|admin: \\\"${m_pass}\\\"|\" /data/config.yaml 2>/dev/null || true
       fi
@@ -330,7 +330,7 @@ generate_env() {
       fi
     "
     # Reiniciamos maubot por si estaba corriendo, para que tome el nuevo config.yaml
-    docker compose -f "${ROOT_DIR}/moodle-matrix-dev/docker-compose.yml" restart maubot >/dev/null 2>&1 || true
+    docker compose -f "${ROOT_DIR}/docker-compose.yml" restart maubot >/dev/null 2>&1 || true
   fi
 
   return 0
@@ -340,7 +340,7 @@ generate_env() {
 ## @brief Imprime la tabla resumen de credenciales y URLs
 print_summary() {
   set +u # Permitir variables no definidas temporalmente
-  source "${ROOT_DIR}/moodle-matrix-dev/.env"
+  source "${ROOT_DIR}/.env"
   set -u
   
   echo ""
@@ -354,7 +354,7 @@ print_summary() {
   echo "Doxygen     http://localhost:8005                                               -"
   echo "Mapeo API   http://mapeo-api:8000                                               (Solo red interna Docker. Token: ${MAPEO_API_TOKEN})"
   
-  cd "${ROOT_DIR}/moodle-matrix-dev" || true
+  cd "${ROOT_DIR}" || true
   if docker compose ps --services --filter "status=running" 2>/dev/null | grep -q "ollama"; then
     echo "Ollama      http://${OLLAMA_BASE_URL:-localhost}:${OLLAMA_PORT:-11434}          (Perfil Activo)"
   else
@@ -441,7 +441,7 @@ setup_synapse_admin() {
   if [[ "$fresh_token" != "$token_in_env" && -n "$fresh_token" ]]; then
     info "Actualizando MATRIX_ACCESS_TOKEN en .env con token fresco..."
     local root_env="${ROOT_DIR}/.env"
-    local inner_env="${ROOT_DIR}/moodle-matrix-dev/.env"
+    local inner_env="${ROOT_DIR}/.env"
     sed -i "s|^MATRIX_ACCESS_TOKEN=.*|MATRIX_ACCESS_TOKEN=${fresh_token}|" "$root_env" 2>/dev/null || \
       sed -i '' "s|^MATRIX_ACCESS_TOKEN=.*|MATRIX_ACCESS_TOKEN=${fresh_token}|" "$root_env"
     sed -i "s|^MATRIX_ACCESS_TOKEN=.*|MATRIX_ACCESS_TOKEN=${fresh_token}|" "$inner_env" 2>/dev/null || \
@@ -503,14 +503,14 @@ cmd_up() {
   
   if [[ "$env_mode" == "production" ]]; then
     # Fail fast si no hay DATABASE_URL o no es postgres
-    local db_url=$(grep -E "^DATABASE_URL=" "${ROOT_DIR}/moodle-matrix-dev/.env" | cut -d= -f2- || true)
+    local db_url=$(grep -E "^DATABASE_URL=" "${ROOT_DIR}/.env" | cut -d= -f2- || true)
     if [[ -z "$db_url" || ! "$db_url" =~ ^postgresql ]]; then
       error "En modo production, DATABASE_URL debe estar configurado y apuntar a PostgreSQL. Para usar SQLite en desarrollo local, ejecuta con '--env=dev'."
     fi
   fi
 
   info "Levantando servicios Docker Compose (Modo: ${env_mode})..."
-  cd "${ROOT_DIR}/moodle-matrix-dev"
+  cd "${ROOT_DIR}"
   
   local compose_args="-f docker-compose.yml"
   if [[ "$env_mode" == "dev" ]]; then
@@ -606,7 +606,7 @@ cmd_git() {
     -v "${ROOT_DIR}:/app" \
     -w /app \
     python:3.11-slim \
-    sh -c "pip install --quiet httpx pyyaml && python moodle-matrix-dev/scripts/configurar_bdc_core.py \"$asignatura\" $profesores"
+    sh -c "pip install --quiet httpx pyyaml && python scripts/configurar_bdc_core.py \"$asignatura\" $profesores"
     
   ok "Repositorio maestro configurado con éxito en GitHub."
 }
@@ -617,14 +617,14 @@ cmd_bot() {
   
   case "$submode" in
     package)
-      local plugin_path="${ROOT_DIR}/moodle-matrix-dev/maubot/llm-wiki-assistant-plugin/plugin.mbp"
+      local plugin_path="${ROOT_DIR}/src/bot/llm-wiki-assistant-plugin/plugin.mbp"
       if [[ -f "$plugin_path" ]]; then
         info "El plugin de Maubot ya está empaquetado (plugin.mbp existe). Omitiendo..."
       else
         info "Empaquetando el plugin de Maubot (Fase 5)..."
         check_docker
-        docker run --rm -v "${ROOT_DIR}/moodle-matrix-dev/maubot/llm-wiki-assistant-plugin:/plugin" alpine sh -c "apk add --no-cache zip && cd /plugin && zip -r plugin.mbp . -x '*/__pycache__/*' -x '*.pyc'"
-        ok "Plugin empaquetado exitosamente en moodle-matrix-dev/maubot/llm-wiki-assistant-plugin/plugin.mbp"
+        docker run --rm -v "${ROOT_DIR}/src/bot/llm-wiki-assistant-plugin:/plugin" alpine sh -c "apk add --no-cache zip && cd /plugin && zip -r plugin.mbp . -x '*/__pycache__/*' -x '*.pyc'"
+        ok "Plugin empaquetado exitosamente en src/bot/llm-wiki-assistant-plugin/plugin.mbp"
       fi
       ;;
     sync)
@@ -650,7 +650,7 @@ cmd_test() {
 
   if [[ "$is_full" == "true" ]]; then
     info "Modo --full detectado: Destruyendo infraestructura y reseteando entorno..."
-    cd "${ROOT_DIR}/moodle-matrix-dev"
+    cd "${ROOT_DIR}"
     docker compose down -v 2>/dev/null || true
     rm -f .env
     cd "${ROOT_DIR}"
@@ -669,7 +669,7 @@ cmd_test() {
 
   # a. Test de infraestructura Docker (Fase 1)
   info "--- Ejecutando bloque A: Infraestructura ---"
-  if "${ROOT_DIR}/moodle-matrix-dev/scripts/test-services.sh"; then
+  if "${ROOT_DIR}/scripts/test-services.sh"; then
     res_infra="[ PASA  ]"
   else
     warn "Fallo en el bloque de Infraestructura."
@@ -681,7 +681,7 @@ cmd_test() {
   local api_fail=0
   docker exec moodle-matrix-dev-mapeo-api-1 alembic upgrade head || api_fail=1
   # Copy tests into the container since they are not mounted by default
-  docker cp "${ROOT_DIR}/moodle-matrix-dev/mapeo-api/tests" moodle-matrix-dev-mapeo-api-1:/code/tests
+  docker cp "${ROOT_DIR}/src/api/tests" moodle-matrix-dev-mapeo-api-1:/code/tests
   docker exec moodle-matrix-dev-mapeo-api-1 bash -c "PYTHONPATH=/code pytest -v /code/tests" || api_fail=1
   if [[ "$api_fail" -eq 0 ]]; then
     res_api="[ PASA  ]"

@@ -1,4 +1,0 @@
-services:
-  mapeo-api:
-    environment:
-      - DATABASE_URL=sqlite:////data/mapeos.db

@@ -1,1 +1,0 @@
-<?php require_once('../../config.php'); $ctx=context_course::instance(7); var_dump(has_capability('moodle/course:update', $ctx, 4), has_capability('moodle/course:viewhiddenactivities', $ctx, 4));
